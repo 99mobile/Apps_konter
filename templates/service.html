@@ -1,0 +1,623 @@
+{% extends 'base.html' %}
+{% block title %}Service HP - Sparepart & Service{% endblock %}
+{% block page_title %}Service HP{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <h3 class="text-lg font-semibold text-gray-800">Data Service HP</h3>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <form method="GET" class="flex gap-2 flex-wrap w-full sm:w-auto">
+                                <div class="flex gap-2 w-full sm:w-auto">
+                    <input type="text" name="search" value="{{ search }}" placeholder="Cari nota/pelanggan..." 
+                           class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-full sm:w-auto">
+                    <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+            <button onclick="openModal('modalTambah')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 whitespace-nowrap">
+                <i class="fas fa-plus"></i><span>Service Baru</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- TAMPILAN DESKTOP (Table) -->
+    <div class="table-desktop hidden md:block overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No Nota</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pelanggan</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HP</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kerusakan</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in pagination.items %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-4 text-sm font-mono font-medium text-blue-600">{{ item.no_nota }}</td>
+                    <td class="px-4 py-4 text-sm">
+                        <p class="font-medium text-gray-900">{{ item.pelanggan }}</p>
+                        <p class="text-xs text-gray-500">{{ item.no_hp or '-' }}</p>
+                    </td>
+                    <td class="px-4 py-4 text-sm text-gray-500">{{ item.merk_hp or '-' }}</td>
+                    <td class="px-4 py-4 text-sm text-gray-500 max-w-xs truncate">{{ item.kerusakan or '-' }}</td>
+                    <td class="px-4 py-4 text-sm text-gray-900 text-right font-medium">
+                        Rp {{ "{:,.0f}".format(item.total).replace(',', '.') }}
+                        {% if item.status_pembayaran == 'belum lunas' %}
+                        <br><span class="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Belum Lunas</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-4 text-center">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full 
+                            {% if item.status == 'proses pengerjaan' %}bg-yellow-100 text-yellow-800
+                            {% elif item.status == 'selesai' %}bg-green-100 text-green-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ item.status|capitalize }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-4 text-center">
+                        <button onclick="showDetail({{ item.id }})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Detail"><i class="fas fa-eye"></i></button>
+                        <button onclick="openStatusModal({{ item.id }}, '{{ item.status }}', {{ item.total }})" class="p-2 text-yellow-600 hover:bg-yellow-50 rounded-lg inline-block" title="Update Status"><i class="fas fa-edit"></i></button>
+                        <a href="{{ url_for('service_hapus', id=item.id) }}" onclick="return confirm('Yakin hapus service ini?')" 
+                           class="p-2 text-red-600 hover:bg-red-50 rounded-lg inline-block" title="Hapus"><i class="fas fa-trash"></i></a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">Tidak ada data service</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- TAMPILAN MOBILE (Card) -->
+    <div class="card-mobile md:hidden p-4 space-y-3">
+        {% for item in pagination.items %}
+        <div class="bg-gray-50 rounded-lg p-4 border border-gray-100 shadow-sm">
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <p class="text-xs font-mono text-blue-600 font-medium bg-blue-50 px-1 rounded inline-block mb-1">{{ item.no_nota }}</p>
+                    <h4 class="font-semibold text-gray-800">{{ item.pelanggan }}</h4>
+                </div>
+                <span class="px-2 py-1 text-xs font-medium rounded-full 
+                    {% if item.status == 'proses pengerjaan' %}bg-yellow-100 text-yellow-800
+                    {% elif item.status == 'selesai' %}bg-green-100 text-green-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ item.status|capitalize }}
+                </span>
+            </div>
+            <div class="text-sm text-gray-600 mb-2">
+                <p><i class="fas fa-mobile-alt w-5 text-gray-400"></i> {{ item.merk_hp or '-' }}</p>
+                <p><i class="fas fa-wrench w-5 text-gray-400"></i> {{ item.kerusakan or '-' }}</p>
+            </div>
+            <div class="flex justify-between items-center border-t pt-2 border-gray-200/50">
+                <span class="font-bold text-gray-800">
+                    Rp {{ "{:,.0f}".format(item.total).replace(',', '.') }}
+                    {% if item.status_pembayaran == 'belum lunas' %}
+                    <span class="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded ml-1">Belum Lunas</span>
+                    {% endif %}
+                </span>
+                <div class="flex gap-2">
+                    <button onclick="showDetail({{ item.id }})" class="p-2 text-blue-600 bg-blue-50 rounded-lg"><i class="fas fa-eye"></i></button>
+                    <button onclick="openStatusModal({{ item.id }}, '{{ item.status }}', {{ item.total }})" class="p-2 text-yellow-600 bg-yellow-50 rounded-lg inline-block" title="Update Status"><i class="fas fa-edit"></i></button>
+                    <a href="{{ url_for('service_hapus', id=item.id) }}" onclick="return confirm('Hapus?')" class="p-2 text-red-600 bg-red-50 rounded-lg"><i class="fas fa-trash"></i></a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">Tidak ada data service</div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="p-4 border-t flex justify-center">
+        <nav class="flex gap-1">
+            {% if pagination.has_prev %}<a href="{{ url_for('service', page=pagination.prev_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">‹</a>{% endif %}
+            {% for p in pagination.iter_pages() %}{% if p %}<a href="{{ url_for('service', page=p, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg {{ 'bg-blue-600 text-white' if p == pagination.page else 'hover:bg-gray-50' }}">{{ p }}</a>{% else %}<span class="px-3 py-2">...</span>{% endif %}{% endfor %}
+            {% if pagination.has_next %}<a href="{{ url_for('service', page=pagination.next_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">›</a>{% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Tambah -->
+<div id="modalTambah" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+            <h3 class="text-lg font-semibold">Service HP Baru</h3>
+            <button onclick="closeModal('modalTambah')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('service_tambah') }}" class="p-4 space-y-4">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Pelanggan *</label>
+                    <input type="text" name="pelanggan" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">No HP</label>
+                    <input type="text" name="no_hp" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Merk HP</label>
+                    <input type="text" name="merk_hp" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Samsung, iPhone, dll">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Teknisi</label>
+                    <select name="teknisi_id" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Pilih Teknisi</option>
+                        {% for t in teknisis %}<option value="{{ t.id }}">{{ t.nama_lengkap }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Kerusakan</label>
+                <textarea name="kerusakan" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Deskripsi kerusakan..."></textarea>
+            </div>
+            
+            <!-- Jasa Section -->
+            <div class="border rounded-lg p-4 bg-gray-50/50">
+                <h4 class="font-medium text-gray-700 mb-3">Jasa Service</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                    {% for j in jasas %}
+                    <label class="flex items-center gap-2 p-2 bg-white border border-gray-200 rounded-lg cursor-pointer hover:border-blue-300 transition-colors">
+                        <input type="checkbox" name="jasa_ids[]" value="{{ j.id }}" class="jasa-check w-4 h-4 text-blue-600 rounded focus:ring-blue-500" data-harga="{{ j.harga }}" onchange="updateServiceTotal()">
+                        <div class="text-sm">
+                            <p class="font-medium text-gray-800">{{ j.nama }}</p>
+                            <p class="text-xs text-gray-500">Rp {{ "{:,.0f}".format(j.harga).replace(',', '.') }}</p>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Sparepart Section -->
+            <div class="border rounded-lg p-4 bg-gray-50/50">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-medium text-gray-700">Sparepart (Opsional)</h4>
+                    <button type="button" onclick="addSparepart()" class="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 shadow-sm">
+                        <i class="fas fa-plus mr-1"></i>Tambah Item
+                    </button>
+                </div>
+                <div id="sparepartContainer" class="space-y-3">
+                    <!-- Dynamic Items Here -->
+                </div>
+            </div>
+            
+            <div class="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                <div class="flex justify-between items-center text-lg">
+                    <span class="font-bold text-blue-800">Total Estimasi:</span>
+                    <span id="totalService" class="font-bold text-blue-600">Rp 0</span>
+                </div>
+            </div>
+            
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalTambah')" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Simpan Service</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- Modal Update Status & Tambah Sparepart -->
+<div id="modalStatus" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg my-8">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+            <h3 class="text-lg font-semibold">Update Service</h3>
+            <button onclick="closeModal('modalStatus')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <!-- Tab Navigation -->
+        <div class="flex border-b">
+            <button onclick="switchTab('status')" id="tab-status" class="flex-1 py-3 font-medium text-blue-600 border-b-2 border-blue-600">Update Status</button>
+            <button onclick="switchTab('sparepart')" id="tab-sparepart" class="flex-1 py-3 font-medium text-gray-500 border-b-2 border-transparent">Tambah Sparepart</button>
+        </div>
+
+        <!-- Form Update Status -->
+        <form id="formUpdateStatus" method="POST" action="" class="p-4 space-y-4 tab-content block">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status Baru</label>
+                <select name="status" id="statusSelect" required onchange="toggleBayarFields()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="proses pengerjaan">Proses Pengerjaan</option>
+                    <option value="sudah selesai dikerjakan">Sudah Selesai Dikerjakan</option>
+                    <option value="sudah diambil">Sudah Diambil (Transaksi Selesai)</option>
+                    <option value="retur">Retur (Batal Service)</option>
+                </select>
+            </div>
+
+            <div id="fieldPembayaran" class="hidden space-y-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p class="text-xs text-gray-500">Total Tagihan: <span id="labelTotalTagihan" class="font-bold text-gray-800"></span></p>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status Pembayaran</label>
+                    <select name="status_pembayaran" id="statusPembayaranSelect" onchange="toggleDibayarField()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="lunas">Lunas (Dibayar Penuh)</option>
+                        <option value="belum lunas">Belum Lunas / Bayar Sebagian</option>
+                    </select>
+                </div>
+                <div id="fieldDibayar" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah Dibayar Sekarang (Rp)</label>
+                    <input type="number" name="dibayar" id="inputDibayar" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0">
+                    <p class="text-[11px] text-gray-400 mt-1">Sisa tagihan akan otomatis masuk ke Buku Piutang.</p>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalStatus')" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Update Status</button>
+            </div>
+        </form>
+
+        <!-- Form Tambah Sparepart Susulan -->
+        <form id="formTambahSp" method="POST" action="" class="p-4 space-y-4 tab-content hidden">
+            <div class="bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm text-blue-800 mb-2">
+                Gunakan form ini untuk menambahkan sparepart baru saat service masih dalam proses.
+            </div>
+            <div id="susulanSpContainer" class="space-y-3 max-h-64 overflow-y-auto p-1">
+                <!-- Dropdown sparepart akan ditambahkan via JS -->
+            </div>
+            <button type="button" onclick="addSusulanSparepart()" class="w-full py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex justify-center items-center gap-2">
+                <i class="fas fa-plus"></i> Tambah Baris Sparepart
+            </button>
+            <div class="flex gap-3 pt-2 border-t mt-4">
+                <button type="button" onclick="closeModal('modalStatus')" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Simpan Sparepart</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Detail -->
+<div id="modalDetail" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold">Detail Service</h3>
+            <button onclick="closeModal('modalDetail')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-4" id="detailContent">
+            <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- Template Sparepart Row -->
+<template id="spRowTemplate">
+    <div class="sp-row grid grid-cols-12 gap-2 items-end border-b border-gray-200 pb-2 last:border-0 last:pb-0">
+        <div class="col-span-12 md:col-span-7">
+            <label class="block text-xs text-gray-500 mb-1">Cari Sparepart</label>
+            <div class="searchable-select relative">
+                <input type="text" class="search-input w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white" 
+                       placeholder="Ketik nama sparepart..." onclick="toggleDropdown(this)" oninput="filterSparepart(this)">
+                <input type="hidden" name="sp_ids[]" class="sp-value">
+                <div class="dropdown-list hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <!-- Options populated via JS -->
+                </div>
+            </div>
+        </div>
+        <div class="col-span-4 md:col-span-2">
+             <label class="block text-xs text-gray-500 mb-1">Qty</label>
+            <input type="number" name="sp_qtys[]" min="1" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm sp-qty text-center" onchange="updateServiceTotal()">
+        </div>
+        <div class="col-span-8 md:col-span-3 flex items-center gap-2">
+            <span class="sp-price text-sm font-medium flex-1 text-right text-gray-700">Rp 0</span>
+            <button type="button" onclick="removeSparepart(this)" class="p-2 text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0"><i class="fas fa-trash"></i></button>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load sparepart data untuk dropdown
+const spareparts = {{ spareparts|tojson|safe }};
+const APP_NAME = {{ app_setting.nama_aplikasi|tojson|safe }};
+
+function populateDropdown(dropdownElement) {
+    let html = '';
+    spareparts.forEach(sp => {
+        html += `
+            <div class="dropdown-item px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0" 
+                 data-id="${sp.id}" data-nama="${sp.nama}" data-harga="${sp.harga_jual}" data-stok="${sp.stok}" 
+                 onclick="selectSparepart(this)">
+                <div class="font-medium text-gray-800">${sp.nama}</div>
+                <div class="text-xs text-gray-500">Stok: ${sp.stok} | ${formatRupiah(sp.harga_jual)}</div>
+            </div>
+        `;
+    });
+    dropdownElement.innerHTML = html;
+}
+
+function addSparepart() {
+    const container = document.getElementById('sparepartContainer');
+    const template = document.getElementById('spRowTemplate');
+    const clone = template.content.cloneNode(true);
+    
+    // Inisialisasi dropdown
+    const dropdown = clone.querySelector('.dropdown-list');
+    populateDropdown(dropdown);
+    
+    container.appendChild(clone);
+}
+
+function removeSparepart(btn) {
+    btn.closest('.sp-row').remove();
+    updateServiceTotal();
+}
+
+// Logic Dropdown Searchable (Sama seperti Penjualan)
+function toggleDropdown(input) {
+    const dropdown = input.nextElementSibling.nextElementSibling;
+    document.querySelectorAll('.dropdown-list').forEach(d => {
+        if (d !== dropdown) d.classList.add('hidden');
+    });
+    // Jika kosong isi dulu
+    if (dropdown.children.length === 0) populateDropdown(dropdown);
+    
+    dropdown.classList.toggle('hidden');
+    filterSparepart(input);
+}
+
+function filterSparepart(input) {
+    const keyword = input.value.toLowerCase();
+    const dropdown = input.nextElementSibling.nextElementSibling;
+    const items = dropdown.querySelectorAll('.dropdown-item');
+    
+    let visibleCount = 0;
+    items.forEach(item => {
+        const nama = item.dataset.nama.toLowerCase();
+        if (nama.includes(keyword)) {
+            item.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            item.classList.add('hidden');
+        }
+    });
+    
+    if(visibleCount === 0) dropdown.classList.add('hidden');
+    else dropdown.classList.remove('hidden');
+}
+
+function selectSparepart(item) {
+    const container = item.closest('.searchable-select');
+    const input = container.querySelector('.search-input');
+    const hiddenInput = container.querySelector('.sp-value');
+    const dropdown = container.querySelector('.dropdown-list');
+    
+    input.value = item.dataset.nama;
+    hiddenInput.value = item.dataset.id;
+    hiddenInput.dataset.harga = item.dataset.harga;
+    hiddenInput.dataset.stok = item.dataset.stok;
+    
+    dropdown.classList.add('hidden');
+    updateServiceTotal();
+}
+
+function updateServiceTotal() {
+    let total = 0;
+    
+    // Hitung Jasa
+    document.querySelectorAll('.jasa-check:checked').forEach(cb => { 
+        total += parseFloat(cb.dataset.harga); 
+    });
+    
+    // Hitung Sparepart
+    document.querySelectorAll('.sp-row').forEach(row => {
+        const hiddenInput = row.querySelector('.sp-value');
+        const harga = parseFloat(hiddenInput?.dataset?.harga || 0);
+        const qty = parseInt(row.querySelector('.sp-qty').value) || 0;
+        const subtotal = harga * qty;
+        row.querySelector('.sp-price').textContent = formatRupiah(subtotal);
+        total += subtotal;
+    });
+    
+    document.getElementById('totalService').textContent = formatRupiah(total);
+}
+
+function showDetail(id) {
+    document.getElementById('detailContent').innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>';
+    openModal('modalDetail');
+    fetch('/service/detail/' + id)
+        .then(r => r.json())
+        .then(data => {
+            currentServiceData = data;
+            let html = `<div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-lg">
+                    <div><span class="text-gray-500">No Nota:</span><br><span class="font-mono font-medium text-blue-600">${data.no_nota}</span></div>
+                    <div><span class="text-gray-500">Status:</span><br><span class="font-medium capitalize badge-status">${data.status}</span></div>
+                    <div><span class="text-gray-500">Pelanggan:</span><br><span class="font-medium text-gray-900">${data.pelanggan}</span></div>
+                    <div><span class="text-gray-500">No HP:</span><br><span class="font-medium">${data.no_hp || '-'}</span></div>
+                    <div class="col-span-2"><span class="text-gray-500">Merk HP:</span><br><span class="font-medium">${data.merk_hp || '-'}</span></div>
+                    <div class="col-span-2"><span class="text-gray-500">Kerusakan:</span><br><span class="font-medium">${data.kerusakan || '-'}</span></div>
+                </div>`;
+                
+            if (data.jasas.length) {
+                html += `<div class="border-t pt-4"><h4 class="font-medium mb-2 text-sm text-gray-700 uppercase">Jasa Service</h4><div class="space-y-1">`;
+                data.jasas.forEach(j => { html += `<div class="flex justify-between text-sm p-2 bg-green-50 rounded text-green-800"><span>${j.nama}</span><span class="font-medium">${formatRupiah(j.harga)}</span></div>`; });
+                html += `</div></div>`;
+            }
+            if (data.spareparts.length) {
+                html += `<div class="border-t pt-4"><h4 class="font-medium mb-2 text-sm text-gray-700 uppercase">Sparepart</h4><div class="space-y-1">`;
+                data.spareparts.forEach(s => { html += `<div class="flex justify-between text-sm p-2 bg-blue-50 rounded text-blue-800"><span>${s.nama} x ${s.jumlah}</span><span class="font-medium">${formatRupiah(s.subtotal)}</span></div>`; });
+                html += `</div></div>`;
+            }
+            html += `<div class="border-t pt-4 mt-2 flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                <span class="font-bold text-gray-800">Total Biaya</span>
+                <span class="text-xl font-bold text-blue-600">${formatRupiah(data.total)}</span>
+            </div>
+            
+            <!-- TOMBOL CETAK STRUK & WHATSAPP SERVICE -->
+            <div class="mt-4 pt-3 border-t space-y-2">
+                <button onclick="cetakStrukService(${id})" class="w-full py-2.5 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900 shadow-md transition flex justify-center items-center gap-2">
+                    <i class="fas fa-print"></i> Cetak Struk Thermal (58mm)
+                </button>
+                <button onclick="kirimStrukServiceWhatsApp()" class="w-full py-2.5 bg-[#25D366] text-white rounded-lg font-bold hover:bg-[#1DA851] shadow-md transition flex justify-center items-center gap-2">
+                    <i class="fab fa-whatsapp text-lg"></i> Kirim Struk via WhatsApp
+                </button>
+            </div>
+            </div>`;
+            document.getElementById('detailContent').innerHTML = html;
+        });
+}
+
+// Kirim struk service sebagai gambar JPG lewat WhatsApp
+let currentServiceData = null;
+function kirimStrukServiceWhatsApp() {
+    const data = currentServiceData;
+    if (!data) return;
+
+    let statusBadge = null;
+    if (data.status === 'sudah diambil') {
+        statusBadge = (data.status_pembayaran === 'belum lunas') ? 'BELUM LUNAS' : 'LUNAS';
+    }
+    // Jika masih dalam proses pengerjaan, statusBadge dibiarkan null (belum relevan)
+
+    const infoLines = [
+        { label: 'No HP', value: data.no_hp || '-' },
+        { label: 'Merk HP', value: data.merk_hp || '-' },
+        { label: 'Kerusakan', value: data.kerusakan || '-' },
+        { label: 'Status', value: data.status }
+    ];
+
+    const items = [];
+    (data.jasas || []).forEach(j => items.push({ nama: j.nama, qtyLine: 'Jasa', subtotal: j.harga }));
+    (data.spareparts || []).forEach(s => items.push({ nama: s.nama, qtyLine: `x${s.jumlah}`, subtotal: s.subtotal }));
+
+    kirimStrukGambarWA({
+        noNota: data.no_nota,
+        tanggal: data.tanggal || '',
+        pelanggan: data.pelanggan,
+        noHp: data.no_hp,
+        infoLines: infoLines,
+        items: items,
+        subtotal: data.total,
+        diskon: 0,
+        total: data.total,
+        dibayar: data.dibayar || 0,
+        sisa: data.sisa || 0,
+        statusBadge: statusBadge,
+        footerNote: 'Terima kasih telah mempercayakan HP Anda kepada kami!'
+    });
+}
+
+// Fungsi untuk membuka popup print struk Service
+
+let _serviceModalTotal = 0;
+
+function openStatusModal(id, currentStatus, total) {
+    document.getElementById('formUpdateStatus').action = '/service/update_status/' + id;
+    document.getElementById('formTambahSp').action = '/service/tambah_sparepart/' + id;
+    document.getElementById('statusSelect').value = currentStatus;
+    _serviceModalTotal = total || 0;
+    document.getElementById('labelTotalTagihan').textContent = formatRupiah(_serviceModalTotal);
+
+    // Tampilkan tab tambah sparepart HANYA jika status adalah "proses pengerjaan"
+    const tabSp = document.getElementById('tab-sparepart');
+    if (currentStatus === 'proses pengerjaan') {
+        tabSp.classList.remove('hidden');
+    } else {
+        tabSp.classList.add('hidden');
+    }
+    
+    // Reset dan tampilkan tab status by default
+    switchTab('status');
+    document.getElementById('susulanSpContainer').innerHTML = ''; // bersihkan form susulan
+    document.getElementById('statusPembayaranSelect').value = 'lunas';
+    document.getElementById('inputDibayar').value = _serviceModalTotal;
+    toggleBayarFields();
+    
+    openModal('modalStatus');
+}
+
+function toggleBayarFields() {
+    const status = document.getElementById('statusSelect').value;
+    const field = document.getElementById('fieldPembayaran');
+    if (status === 'sudah diambil') {
+        field.classList.remove('hidden');
+    } else {
+        field.classList.add('hidden');
+    }
+    toggleDibayarField();
+}
+
+function toggleDibayarField() {
+    const statusBayar = document.getElementById('statusPembayaranSelect').value;
+    const field = document.getElementById('fieldDibayar');
+    const input = document.getElementById('inputDibayar');
+    if (statusBayar === 'belum lunas') {
+        field.classList.remove('hidden');
+        input.value = 0;
+    } else {
+        field.classList.add('hidden');
+        input.value = _serviceModalTotal;
+    }
+}
+
+function switchTab(tabName) {
+    // Sembunyikan semua konten tab
+    document.querySelectorAll('.tab-content').forEach(c => {
+        c.classList.remove('block');
+        c.classList.add('hidden');
+    });
+    // Tampilkan konten tab yang dipilih
+    if(tabName === 'status') {
+        document.getElementById('formUpdateStatus').classList.remove('hidden');
+        document.getElementById('formUpdateStatus').classList.add('block');
+        
+        document.getElementById('tab-status').classList.replace('text-gray-500', 'text-blue-600');
+        document.getElementById('tab-status').classList.replace('border-transparent', 'border-blue-600');
+        
+        document.getElementById('tab-sparepart').classList.replace('text-blue-600', 'text-gray-500');
+        document.getElementById('tab-sparepart').classList.replace('border-blue-600', 'border-transparent');
+    } else {
+        document.getElementById('formTambahSp').classList.remove('hidden');
+        document.getElementById('formTambahSp').classList.add('block');
+        
+        document.getElementById('tab-sparepart').classList.replace('text-gray-500', 'text-blue-600');
+        document.getElementById('tab-sparepart').classList.replace('border-transparent', 'border-blue-600');
+        
+        document.getElementById('tab-status').classList.replace('text-blue-600', 'text-gray-500');
+        document.getElementById('tab-status').classList.replace('border-blue-600', 'border-transparent');
+    }
+}
+
+function addSusulanSparepart() {
+    const container = document.getElementById('susulanSpContainer');
+    const template = document.getElementById('spRowTemplate');
+    const clone = template.content.cloneNode(true);
+    
+    // Inisialisasi dropdown untuk elemen baru
+    const dropdown = clone.querySelector('.dropdown-list');
+    populateDropdown(dropdown);
+    
+    // Hilangkan event updateServiceTotal (tidak relevan untuk form susulan terpisah)
+    clone.querySelector('.sp-qty').removeAttribute('onchange');
+    clone.querySelectorAll('.jasa-check').forEach(cb => cb.removeAttribute('onchange'));
+    
+    container.appendChild(clone);
+}
+
+function cetakStrukService(id) {
+    const printWindow = window.open('/service/cetak/' + id, '_blank', 'width=400,height=600,top=100,left=100');
+    if (printWindow) {
+        printWindow.focus();
+    } else {
+        alert("Harap izinkan pop-up browser untuk mencetak struk.");
+    }
+}
+
+// Close dropdown click outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.searchable-select')) {
+        document.querySelectorAll('.dropdown-list').forEach(d => d.classList.add('hidden'));
+    }
+});
+</script>
+{% endblock %}

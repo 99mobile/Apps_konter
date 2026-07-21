@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nota Pembelian {{ pb.no_nota }}</title>
+    <style>
+        @page {
+            margin: 0;
+            size: 58mm auto;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: #000;
+            margin: 0;
+            padding: 10px;
+            width: 58mm;
+            box-sizing: border-box;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
+        .divider { border-bottom: 1px dashed #000; margin: 5px 0; }
+        .header h2 { font-size: 16px; margin: 0 0 2px 0; text-transform: uppercase; }
+        .header p { margin: 0; font-size: 10px; }
+        .info-table { width: 100%; font-size: 10px; margin-bottom: 5px; }
+        .info-table td { vertical-align: top; padding: 1px 0; }
+        .item-table { width: 100%; font-size: 11px; border-collapse: collapse; }
+        .item-table th { border-bottom: 1px dashed #000; border-top: 1px dashed #000; padding: 3px 0; text-align: left; }
+        .item-table td { padding: 2px 0; vertical-align: top; }
+        .item-name { display: block; margin-bottom: 2px; }
+        .totals-table { width: 100%; font-size: 11px; margin-top: 5px; }
+        .totals-table td { padding: 2px 0; }
+        .footer { margin-top: 15px; font-size: 10px; text-align: center; }
+        @media screen {
+            body { margin: 20px auto; border: 1px solid #ccc; box-shadow: 0 0 10px rgba(0,0,0,0.1); background: #fff; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header text-center">
+        <h2>{{ pb.cabang.nama }}</h2>
+        <p>{{ pb.cabang.alamat or 'Alamat Cabang' }}</p>
+        <p>Telp: {{ pb.cabang.telepon or '-' }}</p>
+    </div>
+
+    <div class="divider"></div>
+    <div class="text-center font-bold" style="font-size:13px; margin:3px 0;">NOTA PEMBELIAN</div>
+    <div class="divider"></div>
+
+    <table class="info-table">
+        <tr>
+            <td>Tgl</td>
+            <td>:</td>
+            <td>{{ pb.tanggal.strftime('%d/%m/%y %H:%M') }}</td>
+        </tr>
+        <tr>
+            <td>Nota</td>
+            <td>:</td>
+            <td>{{ pb.no_nota }}</td>
+        </tr>
+        <tr>
+            <td>User</td>
+            <td>:</td>
+            <td>{{ pb.user.nama_lengkap }}</td>
+        </tr>
+        <tr>
+            <td>Supplier</td>
+            <td>:</td>
+            <td>{{ pb.supplier.nama if pb.supplier else 'Umum' }}</td>
+        </tr>
+    </table>
+
+    <table class="item-table">
+        <thead>
+            <tr>
+                <th colspan="3">Item / Qty x Harga</th>
+                <th class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in pb.items %}
+            <tr>
+                <td colspan="4">
+                    <span class="item-name">{{ item.sparepart.nama }}</span>
+                </td>
+            </tr>
+            <tr>
+                <td style="width:15%;">{{ item.jumlah }}</td>
+                <td style="width:5%;">x</td>
+                <td style="width:40%;">{{ "{:,.0f}".format(item.harga_beli).replace(',', '.') }}</td>
+                <td class="text-right" style="width:40%;">{{ "{:,.0f}".format(item.subtotal).replace(',', '.') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <table class="totals-table">
+        <tr>
+            <td class="font-bold" style="font-size:13px;">TOTAL</td>
+            <td class="font-bold text-right" style="font-size:13px;">{{ "{:,.0f}".format(pb.total).replace(',', '.') }}</td>
+        </tr>
+        <tr>
+            <td>Dibayar</td>
+            <td class="text-right">{{ "{:,.0f}".format(pb.dibayar).replace(',', '.') }}</td>
+        </tr>
+        {% if pb.status_pembayaran != 'lunas' %}
+        <tr>
+            <td class="font-bold">SISA HUTANG</td>
+            <td class="font-bold text-right">{{ "{:,.0f}".format(pb.sisa).replace(',', '.') }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td>Status</td>
+            <td class="text-right font-bold">LUNAS</td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <div class="divider"></div>
+
+    <div class="footer">
+        <p class="font-bold" style="font-size:12px; margin-bottom:2px;">NOTA PEMBELIAN</p>
+        <p>{{ pb.cabang.nama }}</p>
+    </div>
+
+    <script>
+        window.onload = function() { window.print(); }
+    </script>
+</body>
+</html>

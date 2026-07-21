@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+{% block title %}Retur - Sparepart & Service{% endblock %}
+{% block page_title %}Data Retur{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <h3 class="text-lg font-semibold text-gray-800">Data Retur</h3>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <form method="GET" class="flex gap-2 w-full sm:w-auto">
+                                <div class="flex gap-2 w-full sm:w-auto">
+                    <input type="text" name="search" value="{{ search }}" placeholder="Cari no retur..." 
+                           class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-full sm:w-auto">
+                    <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+            <button onclick="openModal('modalTambah')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 whitespace-nowrap">
+                <i class="fas fa-plus"></i><span>Retur Baru</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- TAMPILAN DESKTOP (Table) -->
+    <div class="table-desktop hidden md:block overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">No Retur</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipe</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sparepart</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Jumlah</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Nominal</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in pagination.items %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm font-mono font-medium text-blue-600">{{ item.no_retur }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ item.tanggal.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-orange-100 text-orange-800' if item.tipe == 'pelanggan' else 'bg-purple-100 text-purple-800' }}">
+                            {{ 'Dari Pelanggan' if item.tipe == 'pelanggan' else 'Ke Supplier' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">{{ item.sparepart.nama if item.sparepart else '-' }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 text-center">{{ item.jumlah }}</td>
+                    <td class="px-6 py-4 text-sm text-right font-medium {{ 'text-red-600' if item.tipe == 'supplier' else 'text-gray-900' }}">
+                        Rp {{ "{:,.0f}".format(item.nominal).replace(',', '.') }}
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <a href="{{ url_for('retur_hapus', id=item.id) }}" onclick="return confirm('Yakin hapus retur ini?')" 
+                           class="p-2 text-red-600 hover:bg-red-50 rounded-lg inline-block"><i class="fas fa-trash"></i></a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">Tidak ada data retur</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- TAMPILAN MOBILE (Card) -->
+    <div class="card-mobile md:hidden p-4 space-y-3">
+        {% for item in pagination.items %}
+        <div class="bg-gray-50 rounded-lg p-4 border border-gray-100 shadow-sm">
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <p class="text-xs font-mono text-blue-600 font-medium bg-blue-50 px-1 rounded inline-block mb-1">{{ item.no_retur }}</p>
+                    <h4 class="font-semibold text-gray-800">{{ item.sparepart.nama if item.sparepart else '-' }}</h4>
+                    <p class="text-xs text-gray-500">{{ item.tanggal.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+                <span class="px-2 py-1 text-xs font-medium rounded-full {{ 'bg-orange-100 text-orange-800' if item.tipe == 'pelanggan' else 'bg-purple-100 text-purple-800' }}">
+                    {{ 'Pelanggan' if item.tipe == 'pelanggan' else 'Supplier' }}
+                </span>
+            </div>
+            <div class="flex justify-between items-center border-t pt-2 border-gray-200/50">
+                <div class="text-sm">
+                    <span class="text-gray-500">Qty:</span> <span class="font-medium">{{ item.jumlah }}</span>
+                    <span class="mx-2 text-gray-300">|</span>
+                    <span class="font-medium {{ 'text-red-600' if item.tipe == 'supplier' else 'text-gray-800' }}">Rp {{ "{:,.0f}".format(item.nominal).replace(',', '.') }}</span>
+                </div>
+                <a href="{{ url_for('retur_hapus', id=item.id) }}" onclick="return confirm('Hapus?')" class="p-2 text-red-600 bg-red-50 rounded-lg"><i class="fas fa-trash"></i></a>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">Tidak ada data retur</div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="p-4 border-t flex justify-center">
+        <nav class="flex gap-1">
+            {% if pagination.has_prev %}<a href="{{ url_for('retur', page=pagination.prev_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">‹</a>{% endif %}
+            {% for p in pagination.iter_pages() %}{% if p %}<a href="{{ url_for('retur', page=p, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg {{ 'bg-blue-600 text-white' if p == pagination.page else 'hover:bg-gray-50' }}">{{ p }}</a>{% else %}<span class="px-3 py-2">...</span>{% endif %}{% endfor %}
+            {% if pagination.has_next %}<a href="{{ url_for('retur', page=pagination.next_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">›</a>{% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Tambah -->
+<div id="modalTambah" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold">Retur Baru</h3>
+            <button onclick="closeModal('modalTambah')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('retur_tambah') }}" class="p-4 space-y-4">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tipe Retur *</label>
+                <select name="tipe" id="tipeRetur" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="toggleReturFields()">
+                    <option value="">Pilih Tipe</option>
+                    <option value="pelanggan">Retur dari Pelanggan (Masuk Stok)</option>
+                    <option value="supplier">Retur ke Supplier (Keluar Stok)</option>
+                </select>
+            </div>
+
+            <!-- Field untuk Retur Pelanggan -->
+            <div id="fieldPelanggan" class="hidden space-y-4 p-4 bg-orange-50 rounded-lg border border-orange-100">
+                <p class="text-xs text-orange-600 font-bold uppercase mb-2">Referensi Nota Transaksi (Wajib)</p>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Tipe Transaksi *</label>
+                    <select name="ref_tipe" id="refTipe" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white" onchange="loadRefOptions()">
+                        <option value="">Pilih Tipe</option>
+                        <option value="penjualan">Penjualan</option>
+                        <option value="service">Service</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">No Nota *</label>
+                    <select name="ref_id" id="refId" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                        <option value="">-- Pilih Nota --</option>
+                    </select>
+                    <p class="text-xs text-orange-500 mt-1">Nota yang sudah diretur tidak ditampilkan.</p>
+                </div>
+            </div>
+
+            <!-- Field untuk Retur Supplier -->
+            <div id="fieldSupplier" class="hidden space-y-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
+                <p class="text-xs text-purple-600 font-bold uppercase mb-2">Referensi Nota Pembelian (Wajib)</p>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">No Nota Pembelian *</label>
+                    <select name="pembelian_id" id="pembelianId" class="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                        <option value="">-- Pilih Nota Pembelian --</option>
+                        {% for p in pembelians %}
+                        <option value="{{ p.id }}">{{ p.no_nota }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="text-xs text-purple-500 mt-1">Nota yang sudah diretur tidak ditampilkan.</p>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Sparepart *</label>
+                <!-- Searchable Select untuk Retur -->
+                <div class="searchable-select relative">
+                    <input type="text" class="search-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Ketik cari sparepart..." onclick="toggleDropdown(this)" oninput="filterSparepart(this)">
+                    <input type="hidden" name="sparepart_id" class="sp-value" required>
+                    <div class="dropdown-list hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {% for sp in spareparts %}
+                        <div class="dropdown-item px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0" 
+                             data-id="{{ sp.id }}" data-nama="{{ sp.nama }}" onclick="selectSparepart(this)">
+                            {{ sp.nama }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah *</label>
+                <input type="number" name="jumlah" required min="1" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Keterangan</label>
+                <textarea name="keterangan" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalTambah')" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const penjualans = {{ penjualans|tojson|safe }};
+const services = {{ services|tojson|safe }};
+
+function toggleReturFields() {
+    const tipe = document.getElementById('tipeRetur').value;
+    document.getElementById('fieldPelanggan').classList.toggle('hidden', tipe !== 'pelanggan');
+    document.getElementById('fieldSupplier').classList.toggle('hidden', tipe !== 'supplier');
+}
+
+function loadRefOptions() {
+    const tipe = document.getElementById('refTipe').value;
+    const select = document.getElementById('refId');
+    select.innerHTML = '<option value="">Pilih Nota</option>';
+    
+    if(!tipe) return;
+    
+    const data = tipe === 'penjualan' ? penjualans : services;
+    data.forEach(item => {
+        select.innerHTML += `<option value="${item.id}">${item.no_nota}</option>`;
+    });
+}
+
+// Simple Searchable Dropdown Logic for Single Select
+function toggleDropdown(input) {
+    const dropdown = input.nextElementSibling.nextElementSibling;
+    dropdown.classList.toggle('hidden');
+    filterSparepart(input);
+}
+
+function filterSparepart(input) {
+    const keyword = input.value.toLowerCase();
+    const dropdown = input.nextElementSibling.nextElementSibling;
+    const items = dropdown.querySelectorAll('.dropdown-item');
+    let visible = 0;
+    
+    items.forEach(item => {
+        if (item.dataset.nama.toLowerCase().includes(keyword)) {
+            item.classList.remove('hidden');
+            visible++;
+        } else {
+            item.classList.add('hidden');
+        }
+    });
+    
+    if(visible === 0) dropdown.classList.add('hidden');
+    else dropdown.classList.remove('hidden');
+}
+
+function selectSparepart(item) {
+    const container = item.closest('.searchable-select');
+    const input = container.querySelector('.search-input');
+    const hiddenInput = container.querySelector('.sp-value');
+    const dropdown = container.querySelector('.dropdown-list');
+    
+    input.value = item.dataset.nama;
+    hiddenInput.value = item.dataset.id;
+    dropdown.classList.add('hidden');
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.searchable-select')) {
+        document.querySelectorAll('.dropdown-list').forEach(d => d.classList.add('hidden'));
+    }
+});
+</script>
+{% endblock %}

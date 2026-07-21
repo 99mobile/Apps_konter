@@ -1,0 +1,754 @@
+{% extends 'base.html' %}
+{% block title %}Pembelian - Sparepart & Service{% endblock %}
+{% block page_title %}Pembelian Sparepart{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header: Pencarian & Filter -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <h3 class="text-lg font-semibold text-gray-800">Data Pembelian</h3>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <form method="GET" class="flex gap-2 flex-wrap w-full sm:w-auto">
+                                <div class="flex gap-2 w-full sm:w-auto">
+                    <input type="text" name="search" value="{{ search }}" placeholder="Cari nota..." 
+                           class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-full sm:w-auto">
+                    <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+            <button onclick="openModal('modalTambah')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 whitespace-nowrap">
+                <i class="fas fa-plus"></i><span>Transaksi Baru</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- TAMPILAN DESKTOP (Table) -->
+    <!-- Class 'hidden md:block' menyembunyikan tabel di mobile -->
+    <div class="table-desktop hidden md:block overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">No Nota</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                    
+                    {% if current_user.role == 'admin' %}<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cabang</th>{% endif %}
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in pagination.items %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm font-mono font-medium text-blue-600">{{ item.no_nota }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ item.tanggal.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">{{ item.supplier or 'Umum' }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 text-right">
+                        Rp {{ "{:,.0f}".format(item.total).replace(',', '.') }}
+                        <div class="mt-1">
+                            {% if item.status_pembayaran == 'lunas' %}
+                            <span class="px-2 py-0.5 text-[10px] bg-green-100 text-green-700 rounded-full font-bold uppercase">Lunas</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 text-[10px] bg-amber-100 text-amber-700 rounded-full font-bold uppercase">Kasbon (Sisa: Rp {{ "{:,.0f}".format(item.sisa).replace(',', '.') }})</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    
+                    {% if current_user.role == 'admin' %}<td class="px-6 py-4 text-sm text-gray-500">{{ item.cabang.nama }}</td>{% endif %}
+                    <td class="px-6 py-4 text-center">
+                        <button onclick="showDetail({{ item.id }})" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Detail"><i class="fas fa-eye"></i></button>
+                        {% if item.status_pembayaran != 'lunas' %}
+                        <button onclick="openBayarModal({{ item.id }}, {{ item.sisa }})" class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg" title="Bayar Hutang"><i class="fas fa-money-bill-wave"></i></button>
+                        {% endif %}
+                        <a href="{{ url_for('pembelian_hapus', id=item.id) }}" onclick="return confirm('Yakin hapus pembelian ini? Stok akan dikembalikan.')" 
+                           class="p-2 text-red-600 hover:bg-red-50 rounded-lg inline-block" title="Hapus"><i class="fas fa-trash"></i></a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ 7 if current_user.role == 'admin' else 6 }}" class="px-6 py-8 text-center text-gray-500">Tidak ada data pembelian</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- TAMPILAN MOBILE (Cards) -->
+    <!-- Class 'md:hidden' menampilkan card di mobile -->
+    <div class="card-mobile md:hidden p-4 space-y-3">
+        {% for item in pagination.items %}
+        <div class="bg-gray-50 rounded-lg p-4 border border-gray-100 shadow-sm">
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <p class="text-xs font-mono text-blue-600 font-medium bg-blue-50 px-1 rounded inline-block mb-1">{{ item.no_nota }}</p>
+                    <h4 class="font-semibold text-gray-800">{{ item.supplier or 'Umum' }}</h4>
+                    <p class="text-xs text-gray-500">{{ item.tanggal.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm font-bold text-gray-800">Rp {{ "{:,.0f}".format(item.total).replace(',', '.') }}</p>
+                    
+                </div>
+            </div>
+            {% if current_user.role == 'admin' %}
+            <p class="text-xs text-gray-500 mb-3 flex items-center border-t pt-2 border-gray-200/50">
+                <i class="fas fa-building mr-1.5"></i>{{ item.cabang.nama }}
+            </p>
+            {% endif %}
+            <div class="flex justify-end gap-2 border-t pt-2 mt-2">
+                <button onclick="showDetail({{ item.id }})" 
+                        class="px-3 py-1.5 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200">
+                    <i class="fas fa-eye mr-1"></i> Detail
+                </button>
+                {% if item.status_pembayaran != 'lunas' %}
+                <button onclick="openBayarModal({{ item.id }}, {{ item.sisa }})" class="px-3 py-1.5 text-sm text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200">
+                    <i class="fas fa-money-bill-wave mr-1"></i> Bayar
+                </button>
+                {% endif %}
+                <a href="{{ url_for('pembelian_hapus', id=item.id) }}" onclick="return confirm('Yakin hapus? Stok dikembalikan.')" 
+                   class="px-3 py-1.5 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200">
+                   <i class="fas fa-trash mr-1"></i> Hapus
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">Tidak ada data pembelian</div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="p-4 border-t flex justify-center">
+        <nav class="flex gap-1">
+            {% if pagination.has_prev %}<a href="{{ url_for('pembelian', page=pagination.prev_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">‹</a>{% endif %}
+            {% for p in pagination.iter_pages() %}{% if p %}<a href="{{ url_for('pembelian', page=p, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg {{ 'bg-blue-600 text-white' if p == pagination.page else 'hover:bg-gray-50' }}">{{ p }}</a>{% else %}<span class="px-3 py-2">...</span>{% endif %}{% endfor %}
+            {% if pagination.has_next %}<a href="{{ url_for('pembelian', page=pagination.next_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">›</a>{% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Tambah Transaksi -->
+<div id="modalTambah" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white z-10">
+            <h3 class="text-lg font-semibold">Transaksi Pembelian Baru</h3>
+            <button onclick="closeModal('modalTambah')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('pembelian_tambah') }}" class="p-4 space-y-4">
+            <!-- Data Header -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% if current_user.role == 'admin' %}
+                <input type="hidden" id="selectCabang" value="{{ default_cabang_id }}">
+                {% else %}
+                <input type="hidden" id="selectCabang" value="{{ current_user.cabang_id or default_cabang_id }}">
+                {% endif %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Supplier</label>
+                    <div class="searchable-select relative w-full">
+                        <input type="hidden" name="supplier_id" id="inputSupplierId" value="">
+                        <input type="text" name="supplier" id="inputSupplier" value="Umum" autocomplete="off" placeholder="Ketik cari supplier..." 
+                               class="search-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white" 
+                               onclick="toggleDropdownSupplier(this)" oninput="filterDropdownSupplier(this)">
+                        
+                        <div id="dropdownSupplierList" class="dropdown-list hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            <div class="dropdown-item px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100" 
+                                 data-nama="Umum" onclick="selectSupplier('Umum', '')">
+                                <div class="font-medium text-gray-800">Umum</div>
+                            </div>
+                            {% for p in suppliers %}
+                            <div class="dropdown-item px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0" 
+                                 data-nama="{{ p.nama }}" onclick="selectSupplier('{{ p.nama }}', '{{ p.id }}')">
+                                <div class="font-medium text-gray-800">{{ p.nama }}</div>
+                                <div class="text-xs text-gray-500">{{ p.no_hp or '-' }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Scan Barcode Area -->
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm">
+                <label class="block text-xs font-bold text-blue-700 uppercase mb-2">Scan Barcode</label>
+                <div class="flex gap-2">
+                    <input type="text" id="barcodeInput" class="flex-1 px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Scan alat / ketik kode..." onkeypress="handleBarcodeScanner(event)">
+                    <button type="button" onclick="startCameraScan()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-sm whitespace-nowrap">
+                        <i class="fas fa-camera"></i> <span class="hidden sm:inline">Kamera</span>
+                    </button>
+                </div>
+                <p class="text-xs text-blue-600 mt-1">Tekan <b>Enter</b> setelah scan/ketik kode (otomatis pada scanner desktop).</p>
+            </div>
+
+            <!-- List Item -->
+            <div class="border rounded-lg p-4 bg-gray-50/50">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-medium text-gray-700">Item Sparepart</h4>
+                    <button type="button" onclick="addItem()" class="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 shadow-sm">
+                        <i class="fas fa-plus mr-1"></i>Manual
+                    </button>
+                </div>
+                <div id="itemsContainer" class="space-y-3">
+                    <!-- Item template akan ditambahkan di sini secara dinamis -->
+                </div>
+                
+                <!-- Ringkasan Harga & Diskon -->
+                <div class="mt-4 pt-4 border-t space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-600">Subtotal:</span>
+                        <span id="subtotalHarga" class="font-bold text-gray-800">Rp 0</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-center pt-3 border-t border-dashed border-gray-300">
+                        <span class="font-bold text-lg text-gray-800">Total Akhir:</span>
+                        <span id="totalHarga" class="text-xl font-bold text-blue-600">Rp 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bagian Pembayaran Kasbon/Lunas -->
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-100 shadow-sm mt-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-blue-700 uppercase mb-1">Metode Pembayaran</label>
+                        <select name="metode_pembayaran" id="metodePembayaran" class="w-full px-4 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white font-semibold text-gray-700" onchange="toggleKasbon()">
+                            <option value="lunas">LUNAS</option>
+                            <option value="kasbon">KASBON / PIUTANG</option>
+                        </select>
+                    </div>
+                    <div id="divDP" class="hidden">
+                        <label class="block text-xs font-bold text-amber-600 uppercase mb-1">Bayar DP (Rp)</label>
+                        <input type="number" name="dibayar" id="inputDibayar" class="w-full px-4 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white" placeholder="Contoh: 50000" onkeyup="hitungSisaKasbon()">
+                        <p class="text-xs text-amber-600 mt-1 font-semibold" id="teksSisa">Sisa Hutang: Rp 0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalTambah')" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm">Simpan Transaksi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- Modal Bayar Hutang -->
+<div id="modalBayar" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-semibold">Bayar Hutang Supplier</h3>
+            <button onclick="closeModal('modalBayar')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="formBayar" method="POST" action="" class="p-4 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nominal Pembayaran (Rp)</label>
+                <input type="number" name="nominal" id="inputNominalBayar" required min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1" id="maxBayarText">Maksimal: Rp 0</p>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalBayar')" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Bayar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Scanner Camera -->
+<div id="modalScanner" class="modal hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-semibold">Scan Barcode</h3>
+            <button onclick="stopCameraScan()" class="p-2 hover:bg-gray-200 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-4 bg-black relative">
+            <div id="reader" class="w-full h-64 bg-black"></div>
+        </div>
+        <div class="p-4 text-center">
+            <p class="text-sm text-gray-500">Arahkan kamera ke barcode barang</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detail Pembelian -->
+<div id="modalDetail" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div class="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+            <h3 class="text-lg font-semibold">Detail Pembelian</h3>
+            <button onclick="closeModal('modalDetail')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-4" id="detailContent">
+            <div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden Template for Manual Add (Digunakan JS) -->
+<template id="itemRowTemplate">
+    <div class="item-row grid grid-cols-12 gap-2 items-end border-b border-gray-100 pb-2 mb-2 last:border-0 last:pb-0 last:mb-0">
+        <div class="col-span-12 md:col-span-4">
+            <label class="block text-xs text-gray-500 mb-1">Sparepart</label>
+            <div class="searchable-select relative">
+                <input type="text" class="search-input w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white" placeholder="Ketik cari..." onclick="toggleDropdown(this)" oninput="filterSparepart(this)">
+                <input type="hidden" name="items[]" class="item-value" required>
+                <div class="dropdown-list hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <!-- Options populated by JS -->
+                </div>
+            </div>
+        </div>
+        <div class="col-span-2 md:col-span-2">
+            <label class="block text-xs text-gray-500 mb-1">Qty</label>
+            <input type="number" name="quantities[]" min="1" value="1" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm item-qty text-center" onchange="updateTotal()">
+        </div>
+        <div class="col-span-4 md:col-span-3">
+            <label class="block text-xs text-gray-500 mb-1">Harga Beli</label>
+            <input type="number" name="hargas[]" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm item-harga text-right" onkeyup="updateTotal()" onchange="updateTotal()">
+        </div>
+        <div class="col-span-4 md:col-span-3 flex items-end gap-2">
+            <span class="item-price text-sm font-medium text-gray-700 flex-1 text-right">Rp 0</span>
+            <button type="button" onclick="removeItem(this)" class="p-2 text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0"><i class="fas fa-trash"></i></button>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Data spareparts untuk dropdown manual search
+let spareparts = {{ spareparts|tojson|safe }};
+let html5QrcodeScanner = null;
+
+// --- 1. HANDLE BARCODE SCANNER (DESKTOP & MOBILE) ---
+
+// Desktop Scanner (Enter key on input)
+function handleBarcodeScanner(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault(); // Prevent form submit
+        const code = event.target.value.trim();
+        const cabangId = document.getElementById('selectCabang').value;
+
+        if (!cabangId) {
+            alert("Pilih cabang terlebih dahulu!");
+            return;
+        }
+        if (code) {
+            processScannedCode(cabangId, code);
+            event.target.value = ''; // Clear input for next scan
+        }
+    }
+}
+
+// Mobile Camera Scanner
+function startCameraScan() {
+    const cabangId = document.getElementById('selectCabang').value;
+    if (!cabangId) {
+        alert("Pilih cabang terlebih dahulu!");
+        return;
+    }
+    
+    document.getElementById('modalScanner').classList.remove('hidden');
+    
+    html5QrcodeScanner = new Html5Qrcode("reader");
+    html5QrcodeScanner.start(
+        { facingMode: "environment" }, 
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText, decodedResult) => {
+            processScannedCode(cabangId, decodedText);
+            stopCameraScan(); 
+        },
+        (errorMessage) => { }
+    ).catch(err => {
+        console.error("Error starting scanner", err);
+        alert("Gagal membuka kamera. Pastikan izin kamera aktif.");
+        stopCameraScan();
+    });
+}
+
+function stopCameraScan() {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            html5QrcodeScanner.clear();
+            document.getElementById('modalScanner').classList.add('hidden');
+        }).catch(err => console.error(err));
+    } else {
+        document.getElementById('modalScanner').classList.add('hidden');
+    }
+}
+
+// --- LOGIKA DROPDOWN PELANGGAN ---
+function toggleDropdownSupplier(input) {
+    const dropdown = document.getElementById('dropdownSupplierList');
+    
+    // Tutup dropdown lain yang sedang terbuka
+    document.querySelectorAll('.dropdown-list').forEach(d => {
+        if (d !== dropdown) d.classList.add('hidden');
+    });
+    
+    dropdown.classList.toggle('hidden');
+    filterDropdownSupplier(input);
+}
+
+function filterDropdownSupplier(input) {
+    const keyword = input.value.toLowerCase();
+    const dropdown = document.getElementById('dropdownSupplierList');
+    const items = dropdown.querySelectorAll('.dropdown-item');
+    
+    let visibleCount = 0;
+    items.forEach(item => {
+        const nama = item.dataset.nama.toLowerCase();
+        if (nama.includes(keyword)) {
+            item.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            item.classList.add('hidden');
+        }
+    });
+    
+    if(visibleCount === 0) dropdown.classList.add('hidden');
+    else dropdown.classList.remove('hidden');
+}
+
+function selectSupplier(nama, id) {
+    const input = document.getElementById('inputSupplier');
+    const inputId = document.getElementById('inputSupplierId');
+    const dropdown = document.getElementById('dropdownSupplierList');
+    
+    input.value = nama;
+    inputId.value = id;
+    dropdown.classList.add('hidden');
+}
+
+// Process Code (Fetch API)
+function processScannedCode(cabangId, code) {
+    // Cek apakah item sudah ada di list (berdasarkan dataset kode)
+    const existingRow = Array.from(document.querySelectorAll('.item-row')).find(row => {
+        const input = row.querySelector('.item-value');
+        return input && input.dataset.kode === code; 
+    });
+
+    if (existingRow) {
+        // Increment quantity jika sudah ada
+        const qtyInput = existingRow.querySelector('.item-qty');
+        const currentQty = parseInt(qtyInput.value);
+        const maxStok = parseInt(existingRow.querySelector('.item-value').dataset.stok);
+        
+        if (currentQty < maxStok) {
+            qtyInput.value = currentQty + 1;
+            updateTotal();
+            
+            // Visual feedback (flash effect)
+            existingRow.classList.add('bg-blue-50');
+            setTimeout(() => existingRow.classList.remove('bg-blue-50'), 500);
+        } else {
+            alert("Stok tidak mencukupi!");
+        }
+    } else {
+        // Fetch API jika belum ada
+        fetch(`/api/scan-sparepart/${cabangId}/${code}`)
+            .then(response => response.json())
+            .then(res => {
+                if (res.success) {
+                    addItemFromData(res.data);
+                } else {
+                    alert("Barang tidak ditemukan: " + code);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Terjadi kesalahan koneksi saat mencari barang");
+            });
+    }
+}
+
+// --- 2. ADD ITEM LOGIC ---
+
+// Add item manual (empty row)
+function addItem() {
+    const template = document.getElementById('itemRowTemplate');
+    const clone = template.content.cloneNode(true);
+    
+    // Inisialisasi dropdown pada item baru
+    const dropdown = clone.querySelector('.dropdown-list');
+    populateDropdown(dropdown);
+    
+    document.getElementById('itemsContainer').appendChild(clone);
+}
+
+// Add item from Scanner Data
+function addItemFromData(data) {
+    const template = document.getElementById('itemRowTemplate');
+    const clone = template.content.cloneNode(true);
+    const row = clone.querySelector('.item-row');
+    
+    const searchInput = row.querySelector('.search-input');
+    const hiddenInput = row.querySelector('.item-value');
+    
+    searchInput.value = `${data.nama}`;
+    hiddenInput.value = data.id;
+    hiddenInput.dataset.harga = data.harga_beli_beli;
+    row.querySelector('.item-harga').value = data.harga_beli_beli || 0;
+    hiddenInput.dataset.stok = data.stok;
+    hiddenInput.dataset.kode = data.kode; // Simpan kode untuk cek duplikat scan
+    
+    row.querySelector('.item-price').textContent = formatRupiah(data.harga_beli);
+    
+    // Disable input manual untuk item hasil scan (agar rapi)
+    searchInput.readOnly = true;
+    searchInput.classList.add('bg-gray-100');
+    
+    document.getElementById('itemsContainer').appendChild(row);
+    updateTotal();
+}
+
+// Isi dropdown manual
+function populateDropdown(dropdownElement) {
+    let html = '';
+    spareparts.forEach(sp => {
+        html += `
+            <div class="dropdown-item px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0" 
+                 data-id="${sp.id}" data-nama="${sp.nama}" data-harga="${sp.harga_beli}" 
+                 data-stok="${sp.stok}" data-kode="${sp.kode}"
+                 onclick="selectSparepart(this)">
+                <div class="font-medium text-gray-800">${sp.nama}</div>
+                <div class="text-xs text-gray-500 flex justify-between">
+                    <span>Stok: ${sp.stok}</span>
+                    <span class="font-mono">${sp.kode || '-'}</span>
+                </div>
+            </div>`;
+    });
+    dropdownElement.innerHTML = html;
+}
+
+// --- 3. UI INTERACTIONS ---
+
+function toggleDropdown(input) {
+    if (input.readOnly) return;
+    const dropdown = input.nextElementSibling.nextElementSibling;
+    
+    // Tutup dropdown lain
+    document.querySelectorAll('.dropdown-list').forEach(d => {
+        if (d !== dropdown) d.classList.add('hidden');
+    });
+    
+    // Jika dropdown kosong, isi dulu
+    if (dropdown.children.length === 0) populateDropdown(dropdown);
+    
+    dropdown.classList.toggle('hidden');
+    filterSparepart(input);
+}
+
+function filterSparepart(input) {
+    const keyword = input.value.toLowerCase();
+    const dropdown = input.nextElementSibling.nextElementSibling;
+    const items = dropdown.querySelectorAll('.dropdown-item');
+    
+    let visibleCount = 0;
+    items.forEach(item => {
+        const nama = item.dataset.nama.toLowerCase();
+        const kode = (item.dataset.kode || '').toLowerCase();
+        if (nama.includes(keyword) || kode.includes(keyword)) {
+            item.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            item.classList.add('hidden');
+        }
+    });
+    
+    if(visibleCount === 0) dropdown.classList.add('hidden');
+    else dropdown.classList.remove('hidden');
+}
+
+function selectSparepart(item) {
+    const container = item.closest('.searchable-select');
+    const input = container.querySelector('.search-input');
+    const hiddenInput = container.querySelector('.item-value');
+    const dropdown = container.querySelector('.dropdown-list');
+    
+    input.value = item.dataset.nama;
+    hiddenInput.value = item.dataset.id;
+    hiddenInput.dataset.harga = item.dataset.harga;
+    hiddenInput.dataset.stok = item.dataset.stok;
+    hiddenInput.dataset.kode = item.dataset.kode;
+    
+    dropdown.classList.add('hidden');
+    updateTotal();
+}
+
+function removeItem(btn) {
+    btn.closest('.item-row').remove();
+    updateTotal();
+}
+
+function updateTotal() {
+    let subtotal = 0;
+    
+    // Hitung total item
+    document.querySelectorAll('.item-row').forEach(row => {
+        const hiddenInput = row.querySelector('.item-value');
+        const hargaInput = row.querySelector('.item-harga');
+        const harga = parseFloat(hargaInput ? hargaInput.value : (hiddenInput?.dataset?.harga || 0));
+        const qty = parseInt(row.querySelector('.item-qty').value) || 0;
+        const totalItem = harga * qty;
+        row.querySelector('.item-price').textContent = formatRupiah(totalItem);
+        subtotal += totalItem;
+    });
+
+    const totalAkhir = subtotal;
+
+    document.getElementById('subtotalHarga').textContent = formatRupiah(subtotal);
+    document.getElementById('totalHarga').textContent = formatRupiah(totalAkhir);
+}
+
+// Update sparepart and supplier list when branch changes
+function loadCabangData(cabangId) {
+    if (!cabangId) return;
+    
+    // Reset items pembelian
+    document.getElementById('itemsContainer').innerHTML = '';
+    updateTotal();
+    
+    // 1. Load Sparepart Data
+    fetch('/api/sparepart/' + cabangId)
+        .then(r => r.json())
+        .then(data => {
+            spareparts = data; // Update global variable
+        });
+
+    // 2. Load Supplier Data untuk Dropdown List Custom
+    fetch('/api/supplier/' + cabangId)
+        .then(r => r.json())
+        .then(data => {
+            const dl = document.getElementById('dropdownSupplierList');
+            let html = `<div class="dropdown-item px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100" 
+                             data-nama="Umum" onclick="selectSupplier('Umum')">
+                            <div class="font-medium text-gray-800">Umum</div>
+                        </div>`;
+            data.forEach(p => {
+                const phone = p.no_hp ? p.no_hp : '-';
+                html += `<div class="dropdown-item px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0" 
+                             data-nama="${p.nama}" onclick="selectSupplier('${p.nama}', '${p.id}')">
+                            <div class="font-medium text-gray-800">${p.nama}</div>
+                            <div class="text-xs text-gray-500">${phone}</div>
+                        </div>`;
+            });
+            dl.innerHTML = html;
+        });
+}
+
+// Detail View Modal
+function showDetail(id) {
+    document.getElementById('detailContent').innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i></div>';
+    openModal('modalDetail');
+    fetch('/pembelian/detail/' + id)
+        .then(r => r.json())
+        .then(data => {
+            let html = `
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-lg">
+                        <div><span class="text-gray-500">No Nota:</span><br><span class="font-mono font-medium text-blue-600">${data.no_nota}</span></div>
+                        <div><span class="text-gray-500">Tanggal:</span><br><span class="font-medium">${data.tanggal}</span></div>
+                        <div class="col-span-2"><span class="text-gray-500">Supplier:</span><br><span class="font-medium text-gray-900">${data.supplier || 'Umum'}</span></div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-medium mb-2 text-sm text-gray-700 uppercase tracking-wide">Item Pembelian</h4>
+                        <div class="space-y-2 max-h-48 overflow-y-auto">`;
+            
+            data.items.forEach(item => {
+                html += `<div class="flex justify-between text-sm p-2 border-b border-gray-100 last:border-0">
+                    <span class="text-gray-700">${item.nama} <span class="text-gray-400">x${item.jumlah}</span></span>
+                    <span class="font-medium text-gray-900">${formatRupiah(item.subtotal)}</span>
+                </div>`;
+            });
+            
+            html += `   </div>
+                    </div>
+                    
+                    <div class="border-t pt-3 space-y-1 text-sm">
+                        <div class="flex justify-between text-gray-600">
+                            <span>Subtotal</span>
+                            <span>${formatRupiah(data.subtotal)}</span>
+                        </div>
+                        
+                    </div>
+                    
+                    <div class="bg-blue-50 p-3 rounded-lg flex justify-between items-center mt-2">
+                        <span class="font-bold text-blue-800">Total Akhir</span>
+                        <span class="text-xl font-bold text-blue-600">${formatRupiah(data.total)}</span>
+                    </div>
+                    
+                    <!-- TOMBOL CETAK STRUK -->
+                    <div class="mt-4 pt-3 border-t">
+                        <button onclick="cetakStruk(${id})" class="w-full py-2.5 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900 shadow-md transition flex justify-center items-center gap-2">
+                            <i class="fas fa-print"></i> Cetak Struk Thermal (58mm)
+                        </button>
+                    </div>
+                </div>`;
+            document.getElementById('detailContent').innerHTML = html;
+        });
+}
+
+// Fungsi untuk membuka popup print struk
+function cetakStruk(id) {
+    const printWindow = window.open('/pembelian/cetak/' + id, '_blank', 'width=400,height=600,top=100,left=100');
+    if (printWindow) {
+        printWindow.focus();
+    } else {
+        alert("Harap izinkan pop-up browser untuk mencetak struk.");
+    }
+}
+
+// --- LOGIKA KASBON PENJUALAN ---
+function toggleKasbon() {
+    const metode = document.getElementById('metodePembayaran').value;
+    const divDP = document.getElementById('divDP');
+    const inputDibayar = document.getElementById('inputDibayar');
+    
+    if(metode === 'kasbon') {
+        divDP.classList.remove('hidden');
+        inputDibayar.required = true;
+        hitungSisaKasbon();
+    } else {
+        divDP.classList.add('hidden');
+        inputDibayar.required = false;
+        inputDibayar.value = '';
+    }
+}
+
+function hitungSisaKasbon() {
+    // Ambil total akhir (parsing dari text content Rp X.XXX)
+    let totalText = document.getElementById('totalHarga').textContent;
+    let totalAngka = parseFloat(totalText.replace(/[^0-9]/g, '')) || 0;
+    let dibayar = parseFloat(document.getElementById('inputDibayar').value) || 0;
+    
+    let sisa = totalAngka - dibayar;
+    if(sisa < 0) sisa = 0;
+    
+    document.getElementById('teksSisa').textContent = 'Sisa Hutang: ' + formatRupiah(sisa);
+}
+
+// Pastikan ketika total harga berubah, sisa kasbon juga ikut terupdate
+// Modifikasi sedikit fungsi updateTotal yang sudah ada:
+const originalUpdateTotal = updateTotal;
+updateTotal = function() {
+    originalUpdateTotal(); // Panggil logika aslinya
+    if(document.getElementById('metodePembayaran').value === 'kasbon') {
+        hitungSisaKasbon(); // Update sisa DP
+    }
+}
+
+// Close dropdown click outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.searchable-select')) {
+        document.querySelectorAll('.dropdown-list').forEach(d => d.classList.add('hidden'));
+    }
+});
+
+function openBayarModal(id, sisa) {
+    document.getElementById('formBayar').action = '/pembelian/bayar/' + id;
+    document.getElementById('inputNominalBayar').max = sisa;
+    document.getElementById('maxBayarText').textContent = 'Maksimal: ' + formatRupiah(sisa);
+    openModal('modalBayar');
+}
+
+</script>
+{% endblock %}

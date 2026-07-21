@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Struk {{ pj.no_nota }}</title>
+    <style>
+        /* Pengaturan Kertas Thermal 58mm */
+        @page {
+            margin: 0;
+            size: 58mm auto; /* Lebar 58mm, panjang menyesuaikan konten */
+        }
+        
+        body {
+            font-family: 'Courier New', Courier, monospace; /* Font monospaced terbaik untuk struk */
+            font-size: 12px;
+            color: #000;
+            margin: 0;
+            padding: 10px;
+            width: 58mm; /* Pastikan layout tidak melebihi 58mm */
+            box-sizing: border-box;
+        }
+
+        .text-center { text-align: center; }
+        .text-left { text-align: left; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: bold; }
+        
+        .divider {
+            border-bottom: 1px dashed #000;
+            margin: 5px 0;
+        }
+
+        .header h2 {
+            font-size: 16px;
+            margin: 0 0 2px 0;
+            text-transform: uppercase;
+        }
+        .header p {
+            margin: 0;
+            font-size: 10px;
+        }
+
+        .info-table {
+            width: 100%;
+            font-size: 10px;
+            margin-bottom: 5px;
+        }
+        .info-table td {
+            vertical-align: top;
+            padding: 1px 0;
+        }
+
+        .item-table {
+            width: 100%;
+            font-size: 11px;
+            border-collapse: collapse;
+        }
+        .item-table th {
+            border-bottom: 1px dashed #000;
+            border-top: 1px dashed #000;
+            padding: 3px 0;
+            text-align: left;
+        }
+        .item-table td {
+            padding: 2px 0;
+            vertical-align: top;
+        }
+        
+        .item-name {
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .totals-table {
+            width: 100%;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+        .totals-table td {
+            padding: 2px 0;
+        }
+
+        .footer {
+            margin-top: 15px;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        /* Sembunyikan di layar, hanya muncul saat diprint (opsional) */
+        @media screen {
+            body {
+                margin: 20px auto;
+                border: 1px solid #ccc;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                background: #fff;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Cabang -->
+    <div class="header text-center">
+        <h2>{{ pj.cabang.nama }}</h2>
+        <p>{{ pj.cabang.alamat or 'Alamat Cabang' }}</p>
+        <p>Telp: {{ pj.cabang.telepon or '-' }}</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Info Transaksi -->
+    <table class="info-table">
+        <tr>
+            <td>Tgl</td>
+            <td>:</td>
+            <td>{{ pj.tanggal.strftime('%d/%m/%y %H:%M') }}</td>
+        </tr>
+        <tr>
+            <td>Nota</td>
+            <td>:</td>
+            <td>{{ pj.no_nota }}</td>
+        </tr>
+        <tr>
+            <td>Kasir</td>
+            <td>:</td>
+            <td>{{ pj.user.nama_lengkap }}</td>
+        </tr>
+        <tr>
+            <td>Plg</td>
+            <td>:</td>
+            <td>{{ pj.pelanggan or 'Umum' }}</td>
+        </tr>
+    </table>
+
+    <!-- Detail Barang -->
+    <table class="item-table">
+        <thead>
+            <tr>
+                <th colspan="3">Item / Qty x Harga</th>
+                <th class="text-right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in pj.items %}
+            <tr>
+                <td colspan="4">
+                    <span class="item-name">{{ item.sparepart.nama }}</span>
+                </td>
+            </tr>
+            <tr>
+                <td style="width: 15%;">{{ item.jumlah }}</td>
+                <td style="width: 5%;">x</td>
+                <td style="width: 40%;">{{ "{:,.0f}".format(item.harga_jual).replace(',', '.') }}</td>
+                <td class="text-right" style="width: 40%;">{{ "{:,.0f}".format(item.subtotal).replace(',', '.') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="divider"></div>
+
+    <!-- Ringkasan Total & Pembayaran -->
+    <table class="totals-table">
+        <tr>
+            <td>Subtotal</td>
+            <td class="text-right">{{ "{:,.0f}".format(subtotal).replace(',', '.') }}</td>
+        </tr>
+        {% if pj.diskon > 0 %}
+        <tr>
+            <td>Diskon</td>
+            <td class="text-right">-{{ "{:,.0f}".format(pj.diskon).replace(',', '.') }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+            <td class="font-bold" style="font-size: 13px;">TOTAL</td>
+            <td class="font-bold text-right" style="font-size: 13px;">{{ "{:,.0f}".format(pj.total).replace(',', '.') }}</td>
+        </tr>
+        
+        <!-- Logika Kasbon / Piutang -->
+        <tr>
+            <td>Dibayar</td>
+            <td class="text-right">{{ "{:,.0f}".format(pj.dibayar).replace(',', '.') }}</td>
+        </tr>
+        
+        {% if pj.status_pembayaran == 'kasbon' %}
+        <tr>
+            <td class="font-bold">SISA (KASBON)</td>
+            <td class="font-bold text-right">{{ "{:,.0f}".format(pj.sisa).replace(',', '.') }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td>Kembali</td>
+            <td class="text-right">
+                {% set kembali = pj.dibayar - pj.total %}
+                {{ "{:,.0f}".format(kembali if kembali > 0 else 0).replace(',', '.') }}
+            </td>
+        </tr>
+        {% endif %}
+    </table>
+
+    <div class="divider"></div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p class="font-bold" style="font-size: 12px; margin-bottom: 2px;">TERIMA KASIH</p>
+        <p>Barang yang sudah dibeli<br>tidak dapat dikembalikan</p>
+    </div>
+
+    <!-- Script Print Otomatis -->
+    <script>
+        window.onload = function() {
+            // Langsung memanggil dialog print bawaan browser
+            window.print();
+            
+            // Opsional: Tutup tab otomatis setelah dialog print ditutup (uncomment jika perlu)
+            // window.onafterprint = function() {
+            //     window.close();
+            // }
+        }
+    </script>
+</body>
+</html>

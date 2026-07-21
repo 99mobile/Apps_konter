@@ -1,0 +1,400 @@
+{% extends 'base.html' %}
+{% block title %}Sparepart - Sparepart & Service{% endblock %}
+{% block page_title %}Data Sparepart{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header: Pencarian & Filter -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-800">Daftar Persediaan Barang</h3>
+            <p class="text-xs text-gray-500 mt-1">
+                {% if current_user.role == 'kasir' %}
+                <span class="text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100">
+                    <i class="fas fa-lock mr-1"></i> Mode Lihat (Kasir)
+                </span>
+                {% else %}
+                Kelola stok dan harga sparepart cabang.
+                {% endif %}
+            </p>
+        </div>
+        
+        <div class="flex flex-col sm:flex-row gap-3">
+            <form method="GET" class="flex gap-2 flex-wrap w-full sm:w-auto">
+                                <div class="flex gap-2 w-full sm:w-auto">
+                    <input type="text" name="search" value="{{ search }}" placeholder="Cari nama/kode..." 
+                           class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-full sm:w-auto">
+                    <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Tombol Aksi Hanya untuk Selain Kasir -->
+            {% if current_user.role != 'kasir' %}
+            <div class="flex gap-2 flex-wrap">
+                <a href="{{ url_for('sparepart_export', cabang_id=cabang_id) }}" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-2 whitespace-nowrap shadow-sm" title="Unduh semua data ke CSV/Excel">
+                    <i class="fas fa-file-export"></i><span>Export</span>
+                </a>
+                <button onclick="openModal('modalImport')" class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 flex items-center justify-center gap-2 whitespace-nowrap shadow-sm" title="Unggah data dari file CSV">
+                    <i class="fas fa-file-import"></i><span>Import</span>
+                </button>
+                <button onclick="openModal('modalTambah')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 whitespace-nowrap shadow-sm">
+                    <i class="fas fa-plus"></i><span>Tambah Barang</span>
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- TAMPILAN DESKTOP (Table) -->
+    <div class="table-desktop hidden md:block overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kode</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Barang</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Harga Beli</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">H. Jual 1</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">H. Jual 2</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">H. Jual 3</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Stok</th>
+                    {% if current_user.role == 'admin' %}
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cabang</th>
+                    {% endif %}
+                    
+                    {% if current_user.role != 'kasir' %}
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in pagination.items %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 text-sm font-mono text-blue-600">{{ item.kode }}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.nama }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 text-right italic">Rp {{ "{:,.0f}".format(item.harga_beli).replace(',', '.') }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900 text-right font-bold">Rp {{ "{:,.0f}".format(item.harga_jual).replace(',', '.') }}</td>
+                    <td class="px-6 py-4 text-sm text-blue-600 text-right font-medium">Rp {{ "{:,.0f}".format(item.harga_jual_2).replace(',', '.') }}</td>
+                    <td class="px-6 py-4 text-sm text-purple-600 text-right font-medium">Rp {{ "{:,.0f}".format(item.harga_jual_3).replace(',', '.') }}</td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-2.5 py-1 text-xs font-bold rounded-lg {{ 'bg-rose-100 text-rose-700' if item.stok <= 5 else 'bg-emerald-100 text-emerald-700' }}">
+                            {{ item.stok }}
+                        </span>
+                    </td>
+                    {% if current_user.role == 'admin' %}
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ item.cabang.nama }}</td>
+                    {% endif %}
+                    
+                    {% if current_user.role != 'kasir' %}
+                    <td class="px-6 py-4 text-center space-x-2">
+                        <button onclick="editSparepart({{ item.id }}, '{{ item.kode }}', '{{ item.nama }}', {{ item.harga_beli }}, {{ item.harga_jual }}, {{ item.harga_jual_2 }}, {{ item.harga_jual_3 }}, {{ item.stok }}, {{ item.cabang_id }})" 
+                                class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Barang">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <a href="{{ url_for('sparepart_hapus', id=item.id) }}" onclick="return confirm('Hapus barang ini secara permanen?')" 
+                           class="p-2 text-red-600 hover:bg-red-50 rounded-lg inline-block transition" title="Hapus Barang">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="px-6 py-12 text-center text-gray-400">Tidak ada data sparepart ditemukan.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- TAMPILAN MOBILE (Cards) -->
+    <div class="card-mobile md:hidden p-4 space-y-3">
+        {% for item in pagination.items %}
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <p class="text-[10px] font-mono text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block mb-1">{{ item.kode }}</p>
+                    <h4 class="font-bold text-gray-800">{{ item.nama }}</h4>
+                </div>
+                <div class="text-center">
+                    <p class="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Stok</p>
+                    <span class="px-2 py-0.5 text-xs font-black rounded-md {{ 'bg-rose-100 text-rose-700' if item.stok <= 5 else 'bg-emerald-100 text-emerald-700' }}">
+                        {{ item.stok }}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-dashed border-gray-200">
+                <div>
+                    <span class="text-[10px] text-gray-400 block uppercase font-bold">Harga Jual</span>
+                    <span class="text-sm font-black text-gray-800">Rp {{ "{:,.0f}".format(item.harga_jual).replace(',', '.') }}</span>
+                </div>
+                {% if current_user.role != 'kasir' %}
+                <div class="text-right">
+                    <span class="text-[10px] text-gray-400 block uppercase font-bold">Harga Beli</span>
+                    <span class="text-xs text-gray-500 italic">Rp {{ "{:,.0f}".format(item.harga_beli).replace(',', '.') }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if current_user.role != 'kasir' %}
+            <div class="flex justify-end gap-2 mt-4 pt-3 border-t border-gray-100">
+                <button onclick="editSparepart({{ item.id }}, '{{ item.kode }}', '{{ item.nama }}', {{ item.harga_beli }}, {{ item.harga_jual }}, {{ item.harga_jual_2 }}, {{ item.harga_jual_3 }}, {{ item.stok }}, {{ item.cabang_id }})" 
+                        class="px-4 py-2 text-xs font-bold text-blue-600 bg-white hover:bg-blue-50 rounded-lg border border-blue-200 transition">
+                        <i class="fas fa-edit mr-1"></i> Edit
+                </button>
+                <a href="{{ url_for('sparepart_hapus', id=item.id) }}" onclick="return confirm('Hapus?')" 
+                   class="px-4 py-2 text-xs font-bold text-red-600 bg-white hover:bg-red-50 rounded-lg border border-red-200 transition">
+                   <i class="fas fa-trash mr-1"></i> Hapus
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="p-4 border-t flex justify-center">
+        <nav class="flex gap-1">
+            {% if pagination.has_prev %}
+            <a href="{{ url_for('sparepart', page=pagination.prev_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">‹</a>
+            {% endif %}
+            
+            {% for p in pagination.iter_pages() %}
+                {% if p %}
+                <a href="{{ url_for('sparepart', page=p, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg {{ 'bg-blue-600 text-white font-bold' if p == pagination.page else 'hover:bg-gray-50' }}">{{ p }}</a>
+                {% else %}
+                <span class="px-3 py-2 text-gray-400">...</span>
+                {% endif %}
+            {% endfor %}
+
+            {% if pagination.has_next %}
+            <a href="{{ url_for('sparepart', page=pagination.next_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">›</a>
+            {% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- SECTION MODAL: Hanya dirender jika bukan Kasir -->
+{% if current_user.role != 'kasir' %}
+<!-- Modal Tambah -->
+<div id="modalTambah" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-up">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800">Tambah Sparepart Baru</h3>
+            <button onclick="closeModal('modalTambah')" class="p-2 hover:bg-gray-200 rounded-lg transition"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('sparepart_tambah') }}" class="p-5 space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Kode Barang / Barcode *</label>
+                <div class="flex gap-2">
+                    <input type="text" name="kode" id="tambahKode" required class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Scan atau ketik manual">
+                    <button type="button" onclick="openScanner('tambahKode')" class="px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-100 transition shadow-sm">
+                        <i class="fas fa-barcode"></i>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Barang *</label>
+                <input type="text" name="nama" required class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition" placeholder="Contoh: LCD Samsung A51">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Harga Beli (Modal) *</label>
+                    <input type="number" name="harga_beli" required min="0" class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Harga Jual 1 (Normal) *</label>
+                    <input type="number" name="harga_jual" required min="0" class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-blue-500 uppercase mb-1">Harga Jual 2 (Reseller)</label>
+                    <input type="number" name="harga_jual_2" min="0" value="0" class="w-full px-4 py-2 border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-purple-500 uppercase mb-1">Harga Jual 3 (Grosir)</label>
+                    <input type="number" name="harga_jual_3" min="0" value="0" class="w-full px-4 py-2 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 transition">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Stok Awal *</label>
+                    <input type="number" name="stok" required min="0" value="0" class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+            </div>
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="closeModal('modalTambah')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">Simpan Barang</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Edit -->
+<div id="modalEdit" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-up">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800">Edit Data Sparepart</h3>
+            <button onclick="closeModal('modalEdit')" class="p-2 hover:bg-gray-200 rounded-lg transition"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" id="formEdit" class="p-5 space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Kode Barang / Barcode *</label>
+                <div class="flex gap-2">
+                    <input type="text" name="kode" id="editKode" required class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                    <button type="button" onclick="openScanner('editKode')" class="px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-100 transition shadow-sm">
+                        <i class="fas fa-barcode"></i>
+                    </button>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Barang *</label>
+                <input type="text" name="nama" id="editNama" required class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Harga Beli (Modal) *</label>
+                    <input type="number" name="harga_beli" id="editHargaBeli" required min="0" class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Harga Jual 1 (Normal) *</label>
+                    <input type="number" name="harga_jual" id="editHargaJual" required min="0" class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-blue-500 uppercase mb-1">Harga Jual 2 (Reseller)</label>
+                    <input type="number" name="harga_jual_2" id="editHargaJual2" min="0" value="0" class="w-full px-4 py-2 border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-purple-500 uppercase mb-1">Harga Jual 3 (Grosir)</label>
+                    <input type="number" name="harga_jual_3" id="editHargaJual3" min="0" value="0" class="w-full px-4 py-2 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 transition">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Stok Tersedia *</label>
+                    <input type="number" name="stok" id="editStok" required min="0" class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+            </div>
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="closeModal('modalEdit')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">Perbarui Data</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Import CSV -->
+<div id="modalImport" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-up">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800">Import Sparepart dari CSV</h3>
+            <button onclick="closeModal('modalImport')" class="p-2 hover:bg-gray-200 rounded-lg transition"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('sparepart_import') }}" enctype="multipart/form-data" class="p-5 space-y-4">
+            <!-- Panduan + Download Template -->
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 space-y-2">
+                <p class="font-bold"><i class="fas fa-info-circle mr-1"></i> Cara Import:</p>
+                <ol class="list-decimal list-inside space-y-1">
+                    <li>Unduh contoh template di bawah ini.</li>
+                    <li>Isi data barang sesuai kolom (jangan ubah baris judul kolom).</li>
+                    <li>Simpan sebagai <b>.csv</b>, lalu unggah di sini.</li>
+                </ol>
+                <p class="pt-1">Barang dengan <b>kode yang sudah ada</b> di cabang ini akan <b>diperbarui</b>, sisanya ditambahkan baru.</p>
+                <a href="{{ url_for('sparepart_template') }}" class="inline-flex items-center gap-2 mt-1 px-3 py-2 bg-white border border-amber-300 rounded-lg font-bold text-amber-700 hover:bg-amber-100 transition">
+                    <i class="fas fa-download"></i> Unduh Contoh Template
+                </a>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">File CSV *</label>
+                <input type="file" name="file" accept=".csv" required class="w-full px-4 py-2 border border-gray-300 rounded-xl text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-600 file:font-bold hover:file:bg-blue-100 transition">
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalImport')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition shadow-lg shadow-amber-200">Proses Import</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Scanner Camera -->
+<div id="modalScanner" class="modal hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-up">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-sm font-bold text-gray-800">Scan Barcode / Kode QR</h3>
+            <button onclick="stopScanner()" class="p-2 hover:bg-gray-200 rounded-lg transition text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-4 bg-black relative aspect-square overflow-hidden">
+            <div id="reader" class="w-full h-full bg-black"></div>
+        </div>
+        <div class="p-4 text-center bg-blue-50">
+            <p class="text-xs text-blue-600 font-bold">Arahkan kamera ke kode batang pada barang.</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+<!-- END SECTION MODAL -->
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Fungsi Edit (Hanya jika bukan Kasir)
+{% if current_user.role != 'kasir' %}
+function editSparepart(id, kode, nama, hargaBeli, hargaJual, hargaJual2, hargaJual3, stok, cabangId) {
+    document.getElementById('formEdit').action = '/sparepart/edit/' + id;
+    document.getElementById('editKode').value = kode;
+    document.getElementById('editNama').value = nama;
+    document.getElementById('editHargaBeli').value = hargaBeli;
+    document.getElementById('editHargaJual').value = hargaJual;
+    document.getElementById('editHargaJual2').value = hargaJual2;
+    document.getElementById('editHargaJual3').value = hargaJual3;
+    document.getElementById('editStok').value = stok;
+    openModal('modalEdit');
+}
+
+// Logic Barcode Scanner
+let html5QrcodeScanner = null;
+let targetInputId = null;
+
+function openScanner(inputId) {
+    targetInputId = inputId;
+    openModal('modalScanner');
+    
+    html5QrcodeScanner = new Html5Qrcode("reader");
+    html5QrcodeScanner.start(
+        { facingMode: "environment" }, 
+        { fps: 15, qrbox: { width: 250, height: 150 } },
+        (decodedText) => {
+            document.getElementById(targetInputId).value = decodedText;
+            stopScanner();
+        },
+        () => { /* Error scanning - ignore to keep console clean */ }
+    ).catch(err => {
+        console.error("Camera Error:", err);
+        alert("Gagal mengakses kamera. Izinkan akses kamera atau gunakan browser HTTPS.");
+        stopScanner();
+    });
+}
+
+function stopScanner() {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            html5QrcodeScanner.clear();
+            closeModal('modalScanner');
+        }).catch(() => {
+            closeModal('modalScanner');
+        });
+    } else {
+        closeModal('modalScanner');
+    }
+}
+{% endif %}
+</script>
+{% endblock %}

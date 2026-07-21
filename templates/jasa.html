@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}Jasa Service - Sparepart & Service{% endblock %}
+{% block page_title %}Data Jasa Service{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header: Pencarian & Tombol Tambah -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <h3 class="text-lg font-semibold text-gray-800">Data Jasa Service</h3>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <form method="GET" class="flex gap-2 w-full sm:w-auto">
+                <input type="text" name="search" value="{{ search }}" placeholder="Cari jasa..." 
+                       class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-full sm:w-auto">
+                <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+                    <i class="fas fa-search"></i>
+                </button>
+            </form>
+            {% if current_user.role == 'admin' %}
+            <button onclick="openModal('modalTambah')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 whitespace-nowrap">
+                <i class="fas fa-plus"></i><span>Tambah</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- TAMPILAN DESKTOP (Table) -->
+    <!-- Class 'hidden md:block' menyembunyikan tabel di mobile -->
+    <div class="table-desktop hidden md:block overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Jasa</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Harga</th>
+                    {% if current_user.role == 'admin' %}
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in pagination.items %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ loop.index + (pagination.page - 1) * pagination.per_page }}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.nama }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 text-right">Rp {{ "{:,.0f}".format(item.harga).replace(',', '.') }}</td>
+                    {% if current_user.role == 'admin' %}
+                    <td class="px-6 py-4 text-center">
+                        <button onclick="editJasa({{ item.id }}, '{{ item.nama }}', {{ item.harga }})" 
+                                class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit"><i class="fas fa-edit"></i></button>
+                        <a href="{{ url_for('jasa_hapus', id=item.id) }}" onclick="return confirm('Yakin hapus jasa ini?')" 
+                           class="p-2 text-red-600 hover:bg-red-50 rounded-lg inline-block" title="Hapus"><i class="fas fa-trash"></i></a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ 4 if current_user.role == 'admin' else 3 }}" class="px-6 py-8 text-center text-gray-500">Tidak ada data jasa service</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- TAMPILAN MOBILE (Cards) -->
+    <!-- Class 'md:hidden' menampilkan card di mobile -->
+    <div class="card-mobile md:hidden p-4 space-y-3">
+        {% for item in pagination.items %}
+        <div class="bg-gray-50 rounded-lg p-4 border border-gray-100 shadow-sm">
+            <div class="flex justify-between items-start mb-2">
+                <h4 class="font-semibold text-gray-800">{{ item.nama }}</h4>
+                <span class="text-sm font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
+                    Rp {{ "{:,.0f}".format(item.harga).replace(',', '.') }}
+                </span>
+            </div>
+            
+            {% if current_user.role == 'admin' %}
+            <div class="flex justify-end gap-2 border-t pt-2 mt-2 border-gray-100">
+                <button onclick="editJasa({{ item.id }}, '{{ item.nama }}', {{ item.harga }})" 
+                        class="px-3 py-1.5 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200">
+                    <i class="fas fa-edit mr-1"></i> Edit
+                </button>
+                <a href="{{ url_for('jasa_hapus', id=item.id) }}" onclick="return confirm('Yakin hapus?')" 
+                   class="px-3 py-1.5 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200">
+                   <i class="fas fa-trash mr-1"></i> Hapus
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">Tidak ada data jasa service</div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="p-4 border-t flex justify-center">
+        <nav class="flex gap-1">
+            {% if pagination.has_prev %}<a href="{{ url_for('jasa', page=pagination.prev_num, search=search) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">‹</a>{% endif %}
+            {% for p in pagination.iter_pages() %}{% if p %}<a href="{{ url_for('jasa', page=p, search=search) }}" class="px-3 py-2 text-sm border rounded-lg {{ 'bg-blue-600 text-white' if p == pagination.page else 'hover:bg-gray-50' }}">{{ p }}</a>{% else %}<span class="px-3 py-2">...</span>{% endif %}{% endfor %}
+            {% if pagination.has_next %}<a href="{{ url_for('jasa', page=pagination.next_num, search=search) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">›</a>{% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+{% if current_user.role == 'admin' %}
+<!-- Modal Tambah -->
+<div id="modalTambah" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold">Tambah Jasa Service</h3>
+            <button onclick="closeModal('modalTambah')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('jasa_tambah') }}" class="p-4 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Jasa *</label>
+                <input type="text" name="nama" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Ganti LCD">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Harga *</label>
+                <input type="number" name="harga" required min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="100000">
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalTambah')" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Simpan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Edit -->
+<div id="modalEdit" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div class="p-4 border-b flex justify-between items-center">
+            <h3 class="text-lg font-semibold">Edit Jasa Service</h3>
+            <button onclick="closeModal('modalEdit')" class="p-2 hover:bg-gray-100 rounded-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" id="formEdit" class="p-4 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Jasa *</label>
+                <input type="text" name="nama" id="editNama" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Harga *</label>
+                <input type="number" name="harga" id="editHarga" required min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalEdit')" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Update</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editJasa(id, nama, harga) {
+    document.getElementById('formEdit').action = '/jasa/edit/' + id;
+    document.getElementById('editNama').value = nama;
+    document.getElementById('editHarga').value = harga;
+    openModal('modalEdit');
+}
+</script>
+{% endblock %}

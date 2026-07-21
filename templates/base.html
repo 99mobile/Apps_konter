@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sparepart & Service{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Primary interactive color across the whole app (buttons, links, focus rings)
+                        // remapped from default blue to a modern near-black "ink" scale.
+                        blue: {
+                            50: '#F4F4F5', 100: '#E7E7E9', 200: '#D1D2D6', 300: '#A8A9B3',
+                            400: '#75767F', 500: '#4B4C56', 600: '#2E2F38', 700: '#202128',
+                            800: '#16171C', 900: '#0E0F13'
+                        },
+                        // Brand yellow — the signature accent, used deliberately (sidebar, avatars, CTAs)
+                        brand: {
+                            50: '#FFFBEB', 100: '#FFF3C4', 300: '#FFE066', 400: '#FFDA47',
+                            500: '#FFCC00', 600: '#E6B800', 700: '#B38F00'
+                        }
+                    },
+                    fontFamily: {
+                        heading: ['Manrope', 'Inter', 'sans-serif']
+                    },
+                    borderRadius: { 'xl': '1rem', '2xl': '1.25rem' },
+                    boxShadow: {
+                        sm: '0 2px 10px -3px rgba(14,15,19,0.08), 0 1px 2px rgba(14,15,19,0.04)',
+                        DEFAULT: '0 4px 16px -4px rgba(14,15,19,0.10), 0 2px 4px rgba(14,15,19,0.06)'
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts (Inter for body, Manrope for headings) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Base Settings */
+        body { font-family: 'Inter', sans-serif; background-color: #F6F6F4; }
+        h1, h2, h3, .font-heading { font-family: 'Manrope', 'Inter', sans-serif; }
+        
+        /* Sidebar Transitions */
+        .sidebar-transition { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .content-transition { transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* Sidebar Link Styling */
+        .sidebar-link { white-space: nowrap; overflow: hidden; position: relative; transition: all 0.2s; }
+        .sidebar-link.active { background: rgba(255, 204, 0, 0.12); color: #FFCC00; box-shadow: inset 3px 0 0 0 #FFCC00; }
+        .sidebar-link.active i { color: #FFCC00; }
+        .sidebar-link:hover:not(.active) { background: rgba(255, 255, 255, 0.06); color: #fff; }
+        
+        /* Collapsed State Logic */
+        body.sidebar-collapsed .sidebar-text { opacity: 0; width: 0; display: none; }
+        body.sidebar-collapsed .section-label { display: none; }
+        body.sidebar-collapsed .user-info-text { display: none; }
+        body.sidebar-collapsed .sidebar-logo-text { display: none; }
+        
+        /* Center icons when collapsed */
+        body.sidebar-collapsed .sidebar-link { justify-content: center; padding-left: 0; padding-right: 0; }
+        
+        /* Floating Tooltip (Muncul saat sidebar kecil) */
+        .sidebar-link .tooltip {
+            position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
+            background: #1e293b; color: white; padding: 6px 12px; border-radius: 6px;
+            font-size: 12px; opacity: 0; pointer-events: none; white-space: nowrap;
+            transition: opacity 0.2s; z-index: 50; margin-left: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); font-weight: 500;
+        }
+        body.sidebar-collapsed .sidebar-link:hover .tooltip { opacity: 1; }
+
+        /* Mobile Specific */
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); width: 16rem; } 
+            .sidebar.open { transform: translateX(0); }
+            .content-transition { margin-left: 0 !important; }
+            #btn-minimize { display: none; }
+        }
+
+        /* Modal Animation Helpers */
+        .modal { transition: opacity 0.2s ease; }
+        .modal-content { transition: transform 0.2s ease; }
+        
+        /* Scrollbar Halus */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-slate-800" id="mainBody">
+
+    <!-- Sidebar -->
+    <!-- Default width w-64, collapsed w-20 -->
+    <aside id="sidebar" class="sidebar fixed top-0 left-0 z-40 h-screen bg-[#0E0F13] border-r border-black/40 sidebar-transition flex flex-col w-64 shadow-sm">
+        
+        <!-- Toggle/Minimize Button (Desktop) -->
+        <button id="btn-minimize" onclick="toggleMinimize()" class="absolute -right-3 top-8 bg-[#16171C] border border-black/40 text-slate-300 rounded-full p-1 shadow-md hover:text-brand-500 transition-colors hidden md:flex items-center justify-center w-6 h-6 z-50">
+            <i class="fas fa-chevron-left text-xs transition-transform duration-300" id="minimizeIcon"></i>
+        </button>
+
+        <!-- Logo -->
+        <div class="h-16 flex items-center px-5 border-b border-white/5">
+            <div class="flex items-center gap-3 overflow-hidden w-full">
+                <img src="{{ url_for('static', filename='images/' + app_setting.logo) }}" alt="Logo" class="w-9 h-9 rounded-lg object-contain shrink-0 bg-brand-500 p-1" onerror="this.src='https://placehold.co/32x32/FFCC00/0E0F13?text=S'">
+                <div class="sidebar-logo-text whitespace-nowrap transition-opacity duration-200">
+                    <h1 class="text-base font-heading font-bold text-white tracking-tight">{{ app_setting.nama_aplikasi }}</h1>
+                    <p class="text-[10px] text-brand-500 font-bold uppercase tracking-wider">{{ app_setting.tagline }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- User Info -->
+        <div class="p-4 border-b border-white/5">
+            <div class="flex items-center gap-3 overflow-hidden">
+                <div class="w-9 h-9 rounded-full bg-brand-500 text-[#0E0F13] flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                    {{ current_user.nama_lengkap[0] | upper }}
+                </div>
+                <div class="user-info-text min-w-0 transition-opacity duration-200">
+                    <p class="text-sm font-semibold text-white truncate">{{ current_user.nama_lengkap }}</p>
+                    <p class="text-xs text-slate-400 truncate">{{ current_user.role|capitalize }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Menu -->
+        <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
+            <a href="{{ url_for('dashboard') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'dashboard' }}">
+                <i class="fas fa-home w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Dashboard</span>
+                <span class="tooltip">Dashboard</span>
+            </a>
+            
+            <p class="section-label text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-6 mb-2 px-3">Master Data</p>
+            {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('users') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'users' }}">
+                <i class="fas fa-users w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Manajemen User</span>
+                <span class="tooltip">User</span>
+            </a>
+            {% endif %}
+            
+            <a href="{{ url_for('pelanggan') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'pelanggan' }}">
+                <i class="fas fa-address-book w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Pelanggan</span>
+                <span class="tooltip">Pelanggan</span>
+            </a>
+            
+            <a href="{{ url_for('supplier') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'supplier' }}">
+                <i class="fas fa-truck-loading w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Supplier</span>
+                <span class="tooltip">Supplier</span>
+            </a>
+            
+            <a href="{{ url_for('sparepart') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'sparepart' }}">
+                <i class="fas fa-box w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Sparepart</span>
+                <span class="tooltip">Sparepart</span>
+            </a>
+            <a href="{{ url_for('jasa') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'jasa' }}">
+                <i class="fas fa-wrench w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Jasa Service</span>
+                <span class="tooltip">Jasa Service</span>
+            </a>
+            <a href="{{ url_for('wallet') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'wallet' }}">
+                <i class="fas fa-wallet w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Master Wallet</span>
+            </a>
+            
+            <p class="section-label text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-6 mb-2 px-3">Transaksi</p>
+            <a href="{{ url_for('penjualan') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'penjualan' }}">
+                <i class="fas fa-shopping-cart w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Penjualan (POS)</span>
+                <span class="tooltip">Penjualan</span>
+            </a>
+            <a href="{{ url_for('pembelian') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'pembelian' }}">
+                <i class="fas fa-boxes w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Pembelian (POS)</span>
+                <span class="tooltip">Pembelian</span>
+            </a>
+            <a href="{{ url_for('service') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'service' }}">
+                <i class="fas fa-mobile-alt w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Service HP</span>
+                <span class="tooltip">Service HP</span>
+            </a>
+            <a href="{{ url_for('retur') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'retur' }}">
+                <i class="fas fa-undo w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Retur</span>
+                <span class="tooltip">Retur</span>
+            </a>
+            <p class="section-label text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-6 mb-2 px-3">Keuangan</p>
+            <a href="{{ url_for('piutang') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'piutang' }}">
+                <i class="fas fa-hand-holding-dollar w-5 text-center shrink-0 text-amber-500"></i>
+                <span class="sidebar-text">Buku Piutang</span>
+                <span class="tooltip">Buku Piutang</span>
+            </a>
+            <a href="{{ url_for('kas_masuk') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'kas_masuk' }}">
+                <i class="fas fa-arrow-down w-5 text-center shrink-0 text-emerald-500"></i>
+                <span class="sidebar-text">Kas Masuk</span>
+                <span class="tooltip">Kas Masuk</span>
+            </a>
+            <a href="{{ url_for('kas_keluar') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'kas_keluar' }}">
+                <i class="fas fa-arrow-up w-5 text-center shrink-0 text-rose-500"></i>
+                <span class="sidebar-text">Kas Keluar</span>
+                <span class="tooltip">Kas Keluar</span>
+            </a>
+            <a href="{{ url_for('laporan') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'laporan' }}">
+                <i class="fas fa-chart-pie w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Laporan</span>
+                <span class="tooltip">Laporan</span>
+            </a>
+            {% if current_user.role == 'admin' %}
+            <p class="section-label text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-6 mb-2 px-3">Sistem</p>
+            <a href="{{ url_for('pengaturan') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-300 font-medium {{ 'active' if request.endpoint == 'pengaturan' }}">
+                <i class="fas fa-gear w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Pengaturan</span>
+                <span class="tooltip">Pengaturan</span>
+            </a>
+            {% endif %}
+        </nav>
+        
+        <!-- Logout -->
+        <div class="p-3 border-t border-white/5 mt-auto">
+            <a href="{{ url_for('logout') }}" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-400 hover:bg-rose-500/10 font-medium transition-colors">
+                <i class="fas fa-sign-out-alt w-5 text-center shrink-0"></i>
+                <span class="sidebar-text">Logout</span>
+                <span class="tooltip">Logout</span>
+            </a>
+        </div>
+    </aside>
+    
+    <!-- Mobile Overlay -->
+    <div id="overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-30 hidden md:hidden transition-opacity" onclick="toggleSidebarMobile()"></div>
+    
+    <!-- Main Content -->
+    <div id="main-content" class="md:ml-64 content-transition flex flex-col min-h-screen">
+        <!-- Topbar -->
+        <header class="bg-white/90 backdrop-blur-md sticky top-0 z-20 border-b border-slate-200 relative">
+            <div class="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-brand-500 via-brand-400 to-transparent"></div>
+            <div class="flex items-center justify-between px-4 py-3">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebarMobile()" class="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h2 class="text-lg font-heading font-bold text-slate-800 tracking-tight">{% block page_title %}Dashboard{% endblock %}</h2>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-medium text-slate-500 hidden sm:block">{{ current_user.nama_lengkap }}</span>
+                     <!-- Avatar Placeholder Modern -->
+                    <img src="https://ui-avatars.com/api/?name={{ current_user.nama_lengkap }}&background=FFCC00&color=0E0F13&bold=true" class="w-8 h-8 rounded-full border border-slate-200" alt="Avatar">
+                </div>
+            </div>
+        </header>
+        
+        <!-- Flash Messages (Modern Alert) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="px-4 pt-6 max-w-7xl mx-auto w-full">
+            {% for category, message in messages %}
+            <div class="mb-4 p-4 rounded-xl flex items-start gap-3 shadow-sm border 
+                {% if category == 'success' %}bg-emerald-50 text-emerald-800 border-emerald-100
+                {% elif category == 'error' %}bg-rose-50 text-rose-800 border-rose-100
+                {% else %}bg-blue-50 text-blue-800 border-blue-100{% endif %}">
+                <i class="fas mt-0.5 {% if category == 'success' %}fa-check-circle{% elif category == 'error' %}fa-exclamation-circle{% else %}fa-info-circle{% endif %}"></i>
+                <span class="flex-1 text-sm font-medium">{{ message }}</span>
+                <button onclick="this.parentElement.remove()" class="opacity-60 hover:opacity-100"><i class="fas fa-times"></i></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        
+        <!-- Content Page -->
+        <main class="p-4 md:p-6 w-full max-w-screen-2xl mx-auto flex-1">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="p-4 text-center text-xs text-slate-400 bg-slate-50 border-t border-slate-200">
+            &copy; 2026 {{ app_setting.nama_aplikasi }}. All rights reserved.
+        </footer>
+    </div>
+    
+    <script>
+        // --- LOGIKA SIDEBAR MINIMIZE (DESKTOP) ---
+        const body = document.getElementById('mainBody');
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+        const minimizeIcon = document.getElementById('minimizeIcon');
+
+        // Cek Local Storage (Ingat status sidebar)
+        const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+        if (isCollapsed && window.innerWidth > 768) {
+            applySidebarState(true);
+        }
+
+        function toggleMinimize() {
+            const isCurrentlyCollapsed = body.classList.contains('sidebar-collapsed');
+            applySidebarState(!isCurrentlyCollapsed);
+        }
+
+        function applySidebarState(collapsed) {
+            if (collapsed) {
+                body.classList.add('sidebar-collapsed');
+                sidebar.classList.remove('w-64');
+                sidebar.classList.add('w-20');
+                mainContent.classList.remove('md:ml-64');
+                mainContent.classList.add('md:ml-20');
+                minimizeIcon.classList.add('rotate-180');
+                localStorage.setItem('sidebar-collapsed', 'true');
+            } else {
+                body.classList.remove('sidebar-collapsed');
+                sidebar.classList.add('w-64');
+                sidebar.classList.remove('w-20');
+                mainContent.classList.add('md:ml-64');
+                mainContent.classList.remove('md:ml-20');
+                minimizeIcon.classList.remove('rotate-180');
+                localStorage.setItem('sidebar-collapsed', 'false');
+            }
+        }
+
+        // --- LOGIKA SIDEBAR MOBILE ---
+        function toggleSidebarMobile() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('hidden');
+        }
+        
+        // --- LOGIKA MODAL (BATAL / CLOSE) - Dipertahankan ---
+        // Fungsi ini kompatibel dengan tombol Batal/Close yang sudah ada
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if(modal) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                
+                // Optional: Animasi Masuk (Jika ada elemen child)
+                const content = modal.firstElementChild; 
+                if(content && content.classList.contains('transform')) {
+                    setTimeout(() => {
+                        content.classList.remove('scale-95', 'opacity-0');
+                        content.classList.add('scale-100', 'opacity-100');
+                    }, 10);
+                }
+            }
+        }
+        
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if(modal) {
+                // Cek apakah modal menggunakan animasi CSS (untuk transisi halus)
+                // Jika child pertama memiliki class 'transform', kita asumsikan perlu animasi
+                const content = modal.firstElementChild; 
+                if(content && content.classList.contains('transform')) {
+                    content.classList.remove('scale-100', 'opacity-100');
+                    content.classList.add('scale-95', 'opacity-0');
+                    
+                    // Tunggu animasi selesai baru hide (200ms)
+                    setTimeout(() => {
+                        modal.classList.add('hidden');
+                        document.body.style.overflow = '';
+                    }, 200);
+                } else {
+                    // Fallback: Langsung tutup (seperti kode asli Anda)
+                    // Ini memastikan tombol 'Batal' yang lama tetap bekerja cepat
+                    modal.classList.add('hidden');
+                    document.body.style.overflow = '';
+                }
+            }
+        }
+        
+        function formatRupiah(num) {
+            return 'Rp ' + num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+        
+        // Close modal on escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal:not(.hidden)').forEach(m => {
+                    closeModal(m.id);
+                });
+            }
+        });
+
+        // ==========================================================
+        // KIRIM STRUK SEBAGAI GAMBAR (JPG) VIA WHATSAPP
+        // Dipakai bersama oleh halaman Penjualan & Service.
+        // opts = {
+        //   noNota, tanggal, pelanggan, noHp, infoLines: [{label, value}],
+        //   items: [{nama, qtyLine, subtotal}],
+        //   subtotal, diskon, total, dibayar, sisa,
+        //   statusBadge: 'LUNAS' | 'BELUM LUNAS' | null (null = jangan tampilkan, mis. masih proses),
+        //   footerNote
+        // }
+        // ==========================================================
+        async function kirimStrukGambarWA(opts) {
+            const appName = {{ app_setting.nama_aplikasi|tojson|safe }};
+            const logoUrl = "{{ url_for('static', filename='images/' + app_setting.logo) }}";
+
+            // 1. Bangun elemen struk tersembunyi (mirip nota thermal)
+            const wrap = document.createElement('div');
+            wrap.style.position = 'fixed';
+            wrap.style.left = '-9999px';
+            wrap.style.top = '0';
+            wrap.style.width = '380px';
+            wrap.style.background = '#ffffff';
+            wrap.style.padding = '20px';
+            wrap.style.fontFamily = "'Courier New', Courier, monospace";
+            wrap.style.color = '#000';
+            wrap.style.fontSize = '13px';
+            wrap.style.lineHeight = '1.5';
+
+            let itemsHtml = '';
+            opts.items.forEach(it => {
+                itemsHtml += `<div style="margin-top:4px;">${it.nama}</div>
+                    <div style="display:flex;justify-content:space-between;">
+                        <span>${it.qtyLine}</span><span>${formatRupiah(it.subtotal)}</span>
+                    </div>`;
+            });
+
+            let infoHtml = '';
+            (opts.infoLines || []).forEach(l => {
+                infoHtml += `<div style="display:flex;justify-content:space-between;"><span>${l.label}</span><span style="text-align:right;">${l.value}</span></div>`;
+            });
+
+            let badgeHtml = '';
+            if (opts.statusBadge === 'LUNAS') {
+                badgeHtml = `<div style="margin:10px 0;text-align:center;border:2px solid #16a34a;color:#16a34a;font-weight:bold;padding:6px;border-radius:6px;letter-spacing:2px;">LUNAS</div>`;
+            } else if (opts.statusBadge === 'BELUM LUNAS') {
+                badgeHtml = `<div style="margin:10px 0;text-align:center;border:2px solid #dc2626;color:#dc2626;font-weight:bold;padding:6px;border-radius:6px;letter-spacing:2px;">BELUM LUNAS</div>`;
+            }
+
+            wrap.innerHTML = `
+                <div style="text-align:center;">
+                    <img src="${logoUrl}" style="width:48px;height:48px;object-fit:contain;margin-bottom:6px;" crossorigin="anonymous">
+                    <div style="font-weight:bold;font-size:16px;text-transform:uppercase;">${appName}</div>
+                </div>
+                <div style="border-bottom:1px dashed #000;margin:10px 0;"></div>
+                <div style="display:flex;justify-content:space-between;"><span>No Nota</span><span>${opts.noNota}</span></div>
+                <div style="display:flex;justify-content:space-between;"><span>Tanggal</span><span>${opts.tanggal}</span></div>
+                <div style="display:flex;justify-content:space-between;"><span>Pelanggan</span><span>${opts.pelanggan || 'Umum'}</span></div>
+                ${infoHtml}
+                <div style="border-bottom:1px dashed #000;margin:10px 0;"></div>
+                ${itemsHtml}
+                <div style="border-bottom:1px dashed #000;margin:10px 0;"></div>
+                <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span>${formatRupiah(opts.subtotal)}</span></div>
+                ${opts.diskon ? `<div style="display:flex;justify-content:space-between;"><span>Diskon</span><span>-${formatRupiah(opts.diskon)}</span></div>` : ''}
+                <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:15px;margin-top:4px;"><span>TOTAL</span><span>${formatRupiah(opts.total)}</span></div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;"><span>Dibayar</span><span>${formatRupiah(opts.dibayar)}</span></div>
+                ${opts.sisa > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:bold;color:#dc2626;"><span>SISA</span><span>${formatRupiah(opts.sisa)}</span></div>` : ''}
+                ${badgeHtml}
+                <div style="border-bottom:1px dashed #000;margin:10px 0;"></div>
+                <div style="text-align:center;font-size:11px;">${opts.footerNote || 'Terima kasih!'}</div>
+            `;
+            document.body.appendChild(wrap);
+
+            try {
+                const canvas = await html2canvas(wrap, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+                document.body.removeChild(wrap);
+
+                canvas.toBlob(async function(blob) {
+                    const fileName = `Struk-${opts.noNota}.jpg`;
+                    const file = new File([blob], fileName, { type: 'image/jpeg' });
+
+                    // Coba pakai native share (bisa langsung attach gambar ke WhatsApp di HP)
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        try {
+                            await navigator.share({
+                                files: [file],
+                                title: 'Struk ' + opts.noNota,
+                                text: `Struk ${opts.noNota} dari ${appName}`
+                            });
+                            return;
+                        } catch (err) {
+                            // user membatalkan share, tidak perlu fallback
+                            if (err.name === 'AbortError') return;
+                        }
+                    }
+
+                    // Fallback: download gambar + buka chat WhatsApp untuk lampirkan manual
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = fileName;
+                    link.click();
+
+                    let nomor = prompt('Struk berhasil diunduh. Kirim ke nomor WhatsApp berapa? (kosongkan untuk membuka WhatsApp tanpa nomor tujuan)', opts.noHp || '');
+                    if (nomor === null) return;
+                    nomor = nomor.replace(/[^0-9]/g, '');
+                    if (nomor) {
+                        if (nomor.startsWith('0')) nomor = '62' + nomor.substring(1);
+                        else if (!nomor.startsWith('62')) nomor = '62' + nomor;
+                    }
+                    alert('Struk sudah tersimpan di perangkat. Lampirkan gambar tersebut secara manual di chat WhatsApp yang akan terbuka.');
+                    window.open(`https://wa.me/${nomor}`, '_blank');
+                }, 'image/jpeg', 0.92);
+            } catch (err) {
+                document.body.removeChild(wrap);
+                alert('Gagal membuat gambar struk: ' + err.message);
+            }
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

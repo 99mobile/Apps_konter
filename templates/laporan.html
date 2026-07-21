@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+{% block title %}Laporan Keuangan - Sparepart & Service{% endblock %}
+{% block page_title %}Laporan Transaksi & Keuangan{% endblock %}
+
+{% block content %}
+<!-- Filter Area -->
+<div class="bg-white rounded-xl shadow-sm p-4 mb-6 border border-gray-100">
+    <form method="GET" class="flex flex-wrap gap-4 items-end">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tipe Laporan</label>
+            <select name="tipe" id="tipeLaporan" class="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500" onchange="toggleDateField()">
+                <option value="harian" {{ 'selected' if tipe == 'harian' }}>Harian</option>
+                <option value="bulanan" {{ 'selected' if tipe == 'bulanan' }}>Bulanan</option>
+                <option value="rentang" {{ 'selected' if tipe == 'rentang' }}>Rentang Tanggal</option>
+            </select>
+        </div>
+        <div id="fieldTanggal" class="{{ 'hidden' if tipe != 'harian' }}">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Tanggal</label>
+            <input type="date" name="tanggal" value="{{ tanggal }}" class="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div id="fieldBulan" class="{{ 'hidden' if tipe != 'bulanan' }}">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Bulan</label>
+            <input type="month" name="bulan" value="{{ bulan }}" class="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div id="fieldRentang" class="{{ 'hidden' if tipe != 'rentang' }} flex gap-2 items-end flex-wrap">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Dari Tanggal</label>
+                <input type="date" name="tgl_dari" value="{{ tgl_dari }}" class="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Sampai Tanggal</label>
+                <input type="date" name="tgl_sampai" value="{{ tgl_sampai }}" class="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+        
+        <!-- Pembungkus Tombol -->
+        <div class="flex gap-2">
+            <button type="submit" class="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-sm transition">
+                <i class="fas fa-filter mr-2"></i>Tampilkan
+            </button>
+            
+            <!-- Tombol Export CSV Baru -->
+            <button type="submit" formaction="{{ url_for('laporan_export_csv') }}" formtarget="_blank" class="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 shadow-sm transition flex items-center">
+                <i class="fas fa-file-excel mr-2"></i>Export CSV
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- DIAGRAM TREN BULANAN -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+    <div class="p-4 bg-gray-800 text-white flex flex-wrap gap-3 items-center justify-between">
+        <h3 class="font-bold text-sm tracking-wide uppercase"><i class="fas fa-chart-column mr-2"></i>{{ 'Tren Omzet Perbulan' if current_user.role == 'kasir' else 'Tren Omzet & Laba Perbulan' }}</h3>
+        <form method="GET" class="flex items-center gap-2">
+            {% if cabang_id %}<input type="hidden" name="cabang_id" value="{{ cabang_id }}">{% endif %}
+            <input type="hidden" name="tipe" value="{{ tipe }}">
+            <input type="hidden" name="tanggal" value="{{ tanggal }}">
+            <input type="hidden" name="bulan" value="{{ bulan }}">
+            <input type="hidden" name="tgl_dari" value="{{ tgl_dari }}">
+            <input type="hidden" name="tgl_sampai" value="{{ tgl_sampai }}">
+            <label class="text-xs font-medium text-gray-200">Tahun:</label>
+            <select name="tahun_chart" onchange="this.form.submit()" class="px-3 py-1.5 rounded-lg text-sm text-gray-800">
+                {% for th in tahun_list %}
+                <option value="{{ th }}" {{ 'selected' if th == tahun_chart }}>{{ th }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+    <div class="p-4">
+        <canvas id="chartBulanan" height="90"></canvas>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- TABEL 1: RINGKASAN LABA RUGI (PROFIT & LOSS) -->
+    {% if current_user.role != 'kasir' %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-4 bg-gray-800 text-white">
+            <h3 class="font-bold text-sm tracking-wide uppercase"><i class="fas fa-chart-line mr-2"></i>Ringkasan Laba Rugi</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-100 text-gray-600">
+                    <tr>
+                        <th class="p-3 font-semibold">Kategori Pendapatan</th>
+                        <th class="p-3 text-right font-semibold border-l border-white">Total Omzet</th>
+                        <th class="p-3 text-right font-semibold border-l border-white">Modal (HPP)</th>
+                        <th class="p-3 text-right font-semibold border-l border-white text-emerald-600">Laba Bersih</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 font-medium text-gray-800">
+                            Penjualan Sparepart<br>
+                            <span class="text-[10px] text-gray-400 font-normal">Dari Transaksi Toko & Service (sudah diambil)</span>
+                            {% if summary.total_retur_pelanggan > 0 %}
+                            <br><span class="text-[10px] text-red-500 font-semibold">Sudah dikurangi Retur: -Rp {{ "{:,.0f}".format(summary.total_retur_pelanggan).replace(',', '.') }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="p-3 text-right text-gray-700">Rp {{ "{:,.0f}".format(summary.omzet_sparepart).replace(',', '.') }}</td>
+                        <td class="p-3 text-right text-rose-600">-Rp {{ "{:,.0f}".format(summary.modal_sparepart).replace(',', '.') }}</td>
+                        <td class="p-3 text-right font-bold text-emerald-600">Rp {{ "{:,.0f}".format(summary.laba_sparepart).replace(',', '.') }}</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 font-medium text-gray-800">
+                            Jasa Service<br>
+                            <span class="text-[10px] text-gray-400 font-normal">Hanya Service Status "Sudah Diambil"</span>
+                        </td>
+                        <td class="p-3 text-right text-gray-700">Rp {{ "{:,.0f}".format(summary.omzet_jasa).replace(',', '.') }}</td>
+                        <td class="p-3 text-right text-gray-400">-Rp 0</td>
+                        <td class="p-3 text-right font-bold text-emerald-600">Rp {{ "{:,.0f}".format(summary.laba_jasa).replace(',', '.') }}</td>
+                    </tr>
+                </tbody>
+                <tfoot class="bg-blue-50">
+                    <tr>
+                        <td class="p-4 font-black text-blue-900 uppercase">TOTAL KESELURUHAN</td>
+                        <td class="p-4 text-right font-black text-blue-900">Rp {{ "{:,.0f}".format(summary.total_omzet).replace(',', '.') }}</td>
+                        <td class="p-4 text-right font-bold text-rose-700">-Rp {{ "{:,.0f}".format(summary.total_modal).replace(',', '.') }}</td>
+                        <td class="p-4 text-right font-black text-emerald-600 text-lg">Rp {{ "{:,.0f}".format(summary.total_laba).replace(',', '.') }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- TABEL 2: ARUS KAS KESELURUHAN -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-4 bg-gray-800 text-white">
+            <h3 class="font-bold text-sm tracking-wide uppercase"><i class="fas fa-wallet mr-2"></i>Ringkasan Arus Kas Fisik</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-100 text-gray-600">
+                    <tr>
+                        <th class="p-3 font-semibold">Keterangan</th>
+                        <th class="p-3 text-right font-semibold">Nominal Masuk/Keluar</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr class="hover:bg-emerald-50">
+                        <td class="p-4 font-medium text-emerald-700">
+                            <i class="fas fa-arrow-down mr-2 bg-emerald-100 p-2 rounded-lg"></i>
+                            Total Kas Masuk (Pemasukan)
+                        </td>
+                        <td class="p-4 text-right font-bold text-emerald-600 text-lg">
+                            + Rp {{ "{:,.0f}".format(summary.kas_masuk).replace(',', '.') }}
+                        </td>
+                    </tr>
+                    <tr class="hover:bg-rose-50">
+                        <td class="p-4 font-medium text-rose-700">
+                            <i class="fas fa-arrow-up mr-2 bg-rose-100 p-2 rounded-lg"></i>
+                            Total Kas Keluar (Pengeluaran)
+                        </td>
+                        <td class="p-4 text-right font-bold text-rose-600 text-lg">
+                            - Rp {{ "{:,.0f}".format(summary.kas_keluar).replace(',', '.') }}
+                        </td>
+                    </tr>
+                </tbody>
+                <tfoot class="bg-gray-50 border-t-2 border-gray-200">
+                    <tr>
+                        <td class="p-4 font-black text-gray-800 uppercase">SISA SALDO KAS BERSIH</td>
+                        <td class="p-4 text-right font-black text-xl {{ 'text-emerald-600' if summary.saldo_kas >= 0 else 'text-rose-600' }}">
+                            Rp {{ "{:,.0f}".format(summary.saldo_kas).replace(',', '.') }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+    <!-- TABEL 2.5: RINGKASAN PEMBELIAN & HUTANG -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6 col-span-1 lg:col-span-2">
+        <div class="p-4 bg-gray-800 text-white flex justify-between items-center">
+            <h3 class="font-bold text-sm tracking-wide uppercase"><i class="fas fa-file-invoice-dollar mr-2"></i>Ringkasan Pembelian & Hutang</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-100 text-gray-600">
+                    <tr>
+                        <th class="p-3 font-semibold">Total Nilai Pembelian (Periode Ini)</th>
+                        <th class="p-3 text-right font-semibold text-rose-600">Total Hutang Baru (Periode Ini)</th>
+                        <th class="p-3 text-right font-semibold text-orange-600">Total Hutang Belum Lunas (Semua Waktu)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr class="hover:bg-amber-50">
+                        <td class="p-4 font-bold text-gray-800 text-lg">
+                            Rp {{ "{:,.0f}".format(summary.total_pembelian).replace(',', '.') }}
+                        </td>
+                        <td class="p-4 text-right font-bold text-rose-600 text-lg">
+                            Rp {{ "{:,.0f}".format(summary.hutang_pembelian).replace(',', '.') }}
+                        </td>
+                        <td class="p-4 text-right font-black text-orange-600 text-lg">
+                            Rp {{ "{:,.0f}".format(summary.total_hutang_outstanding).replace(',', '.') }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+
+<!-- TABEL 3: DETAIL TRANSAKSI PENJUALAN & SERVICE -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+    <div class="p-4 bg-gray-100 border-b flex justify-between items-center">
+        <h3 class="font-bold text-gray-800 text-sm tracking-wide uppercase">Rincian Transaksi (Penjualan, Pembelian & Service)</h3>
+    </div>
+    <div class="overflow-x-auto max-h-96">
+        <table class="w-full text-sm text-left">
+            <thead class="bg-gray-50 text-gray-500 sticky top-0 shadow-sm z-10">
+                <tr>
+                    <th class="px-4 py-3 font-semibold">Tipe</th>
+                    <th class="px-4 py-3 font-semibold">No Nota</th>
+                    <th class="px-4 py-3 font-semibold">Pelanggan / Produk</th>
+                    <th class="px-4 py-3 text-right font-semibold">Total Omzet</th>
+                    {% if current_user.role != 'kasir' %}
+                    <th class="px-4 py-3 text-right font-semibold text-rose-600">Modal (HPP)</th>
+                    <th class="px-4 py-3 text-right font-semibold text-emerald-600">Laba Bersih</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                <!-- Data Penjualan -->
+                {% for item in data.penjualan %}
+                <tr class="hover:bg-blue-50">
+                    <td class="px-4 py-3"><span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Penjualan</span></td>
+                    <td class="px-4 py-3 font-mono text-gray-600">{{ item.no_nota }}</td>
+                    <td class="px-4 py-3 font-medium">{{ item.pelanggan or 'Umum' }}</td>
+                    <td class="px-4 py-3 text-right text-gray-800">Rp {{ "{:,.0f}".format(item.total).replace(',', '.') }}</td>
+                    {% if current_user.role != 'kasir' %}
+                    <td class="px-4 py-3 text-right text-rose-600">-Rp {{ "{:,.0f}".format(item.total - item.laba).replace(',', '.') }}</td>
+                    <td class="px-4 py-3 text-right font-bold text-emerald-600">Rp {{ "{:,.0f}".format(item.laba).replace(',', '.') }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+                
+                
+                <!-- Data Pembelian -->
+                {% for item in data.pembelian %}
+                <tr class="hover:bg-amber-50">
+                    <td class="px-4 py-3"><span class="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Pembelian</span></td>
+                    <td class="px-4 py-3 font-mono text-gray-600">{{ item.no_nota }}</td>
+                    <td class="px-4 py-3 font-medium">{{ item.supplier.nama or 'Umum' }} <span class="block text-[10px] text-gray-400 font-normal">(Supplier)</span></td>
+                    <td class="px-4 py-3 text-right text-gray-800">-</td>
+                    {% if current_user.role != 'kasir' %}
+                    <td class="px-4 py-3 text-right text-rose-600">Rp {{ "{:,.0f}".format(item.total).replace(',', '.') }}</td>
+                    <td class="px-4 py-3 text-right font-bold text-emerald-600">-</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+
+                <!-- Data Service -->
+                {% for item in data.service %}
+                <tr class="hover:bg-green-50">
+                    <td class="px-4 py-3"><span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase">Service</span></td>
+                    <td class="px-4 py-3 font-mono text-gray-600">{{ item.no_nota }}</td>
+                    <td class="px-4 py-3 font-medium">{{ item.pelanggan }}</td>
+                    <td class="px-4 py-3 text-right text-gray-800">Rp {{ "{:,.0f}".format(item.total).replace(',', '.') }}</td>
+                    {% if current_user.role != 'kasir' %}
+                    <td class="px-4 py-3 text-right text-rose-600">-Rp {{ "{:,.0f}".format((item.total_sparepart or 0) - (item.laba_sparepart or 0)).replace(',', '.') }}</td>
+                    <td class="px-4 py-3 text-right font-bold text-emerald-600">Rp {{ "{:,.0f}".format(item.laba_jasa + item.laba_sparepart).replace(',', '.') }}</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+                
+                {% if not data.penjualan and not data.pembelian and not data.service %}
+                <tr><td colspan="{{ 6 if current_user.role != 'kasir' else 4 }}" class="px-4 py-6 text-center text-gray-400 italic">Tidak ada transaksi di periode ini.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- TABEL 4: VALUASI STOK (ASET BARANG) -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div class="p-4 bg-gray-800 text-white flex justify-between items-center">
+        <h3 class="font-bold text-sm tracking-wide uppercase"><i class="fas fa-boxes mr-2"></i>Valuasi Aset Stok Sparepart</h3>
+        <p class="text-[10px] opacity-70">Sisa barang yang mengendap (Modal Tertahan)</p>
+    </div>
+    <div class="overflow-x-auto max-h-96">
+        <table class="w-full text-sm text-left">
+            <thead class="bg-gray-100 text-gray-600 sticky top-0 shadow-sm">
+                <tr>
+                    <th class="px-4 py-3 font-semibold">Kode</th>
+                    <th class="px-4 py-3 font-semibold">Nama Sparepart</th>
+                    <th class="px-4 py-3 text-center font-semibold">Stok Sisa</th>
+                    <th class="px-4 py-3 text-right font-semibold">Harga Modal (Satuan)</th>
+                    <th class="px-4 py-3 text-right font-semibold">Total Nilai Aset</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% set total_aset = [] %}
+                {% for s in data.stok %}
+                {% set aset = s.stok * s.harga_beli %}
+                {% if total_aset.append(aset) %}{% endif %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-mono text-gray-500 text-xs">{{ s.kode }}</td>
+                    <td class="px-4 py-3 font-medium text-gray-800">{{ s.nama }}</td>
+                    <td class="px-4 py-3 text-center"><span class="bg-gray-200 px-2 py-0.5 rounded font-bold">{{ s.stok }}</span></td>
+                    <td class="px-4 py-3 text-right text-gray-500">Rp {{ "{:,.0f}".format(s.harga_beli).replace(',', '.') }}</td>
+                    <td class="px-4 py-3 text-right font-bold text-gray-700">Rp {{ "{:,.0f}".format(aset).replace(',', '.') }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="px-4 py-6 text-center text-gray-400 italic">Tidak ada stok tersisa.</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="bg-blue-50">
+                <tr>
+                    <td colspan="4" class="px-4 py-4 text-right font-bold text-blue-900">ESTIMASI TOTAL NILAI BARANG TERSISA:</td>
+                    <td class="px-4 py-4 text-right font-black text-blue-700 text-lg">Rp {{ "{:,.0f}".format(total_aset|sum).replace(',', '.') }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+function toggleDateField() {
+    const tipe = document.getElementById('tipeLaporan').value;
+    document.getElementById('fieldTanggal').classList.toggle('hidden', tipe !== 'harian');
+    document.getElementById('fieldBulan').classList.toggle('hidden', tipe !== 'bulanan');
+    document.getElementById('fieldRentang').classList.toggle('hidden', tipe !== 'rentang');
+}
+
+const ctxBulanan = document.getElementById('chartBulanan');
+if (ctxBulanan) {
+    new Chart(ctxBulanan, {
+        type: 'bar',
+        data: {
+            labels: ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
+            datasets: [
+                {
+                    label: 'Omzet',
+                    data: {{ chart_omzet|tojson }},
+                    backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                    borderRadius: 4,
+                    order: 2
+                }
+                {% if current_user.role != 'kasir' %}
+                ,{
+                    label: 'Laba Bersih',
+                    data: {{ chart_laba|tojson }},
+                    type: 'line',
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgb(16, 185, 129)',
+                    tension: 0.3,
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    order: 1
+                }
+                {% endif %}
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const val = ctx.parsed.y || 0;
+                            return ctx.dataset.label + ': Rp ' + val.toLocaleString('id-ID');
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    ticks: {
+                        callback: function(val) {
+                            return 'Rp ' + (val / 1000) + 'rb';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

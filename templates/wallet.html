@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block title %}Master Wallet - Sparepart & Service{% endblock %}
+{% block page_title %}Master Wallet & Pulsa{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h3 class="text-lg font-semibold text-gray-800">Master Saldo Wallet</h3>
+            <p class="text-xs text-gray-500 mt-1">Kelola perputaran saldo Dana, ShopeePay, Pulsa, dll.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <!-- Hanya Admin yang bisa buat JENIS Wallet baru -->
+            {% if current_user.role != 'kasir' %}
+            <button onclick="openModal('modalTambah')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 shadow-sm transition">
+                <i class="fas fa-plus"></i><span>Tambah Jenis Wallet</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Grid Card Wallet -->
+    <div class="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for item in wallets %}
+        <div class="bg-slate-50 rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition group">
+            <div class="flex justify-between items-start mb-4">
+                <div class="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                    <i class="fas fa-wallet text-xl"></i>
+                </div>
+                <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-white border rounded-md text-slate-500 shadow-sm">
+                    {{ item.cabang.nama }}
+                </span>
+            </div>
+            
+            <h4 class="text-xl font-bold text-slate-800 mb-1">{{ item.nama }}</h4>
+            <div class="mb-4">
+                <p class="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">Sisa Saldo Tersedia</p>
+                <p class="text-2xl font-black text-emerald-600">Rp {{ "{:,.0f}".format(item.stok_saldo).replace(',', '.') }}</p>
+            </div>
+            
+            <div class="flex items-center justify-between text-sm bg-white p-3 rounded-lg border border-slate-100 mb-5">
+                <span class="text-slate-500">Biaya Admin:</span>
+                <span class="font-bold text-slate-700">Rp {{ "{:,.0f}".format(item.biaya_admin_default | int).replace(',', '.') }}</span>
+            </div>
+
+            <!-- Tombol Aksi Wallet -->
+            <div class="grid grid-cols-1 gap-2">
+                <button onclick="openUpdateStok({{ item.id }}, '{{ item.nama }}')"
+                        class="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition text-sm">
+                    <i class="fas fa-plus-circle mr-1"></i> Isi Ulang Saldo
+                </button>
+                {% if current_user.role != 'kasir' %}
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="openEditWallet({{ item.id }}, '{{ item.nama | replace("'", "\\'") }}', {{ item.stok_saldo }}, {{ item.biaya_admin_default }})"
+                            class="py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition text-xs">
+                        <i class="fas fa-edit mr-1"></i> Edit Saldo
+                    </button>
+                    {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('wallet_hapus', id=item.id) }}"
+                       onclick="return confirm('Hapus wallet \'{{ item.nama }}\'?\n\nTindakan ini permanen dan tidak bisa dibatalkan!')"
+                       class="py-2 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition text-xs text-center">
+                        <i class="fas fa-trash mr-1"></i> Hapus
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+            <i class="fas fa-wallet text-4xl mb-3 opacity-20"></i>
+            <p class="text-sm">Belum ada data wallet di cabang ini.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Modal Tambah Wallet (Hanya untuk Admin/Selain Kasir) -->
+{% if current_user.role != 'kasir' %}
+<div id="modalTambah" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-up">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800">Tambah Jenis Wallet</h3>
+            <button onclick="closeModal('modalTambah')" class="p-2 hover:bg-gray-100 rounded-lg transition"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('wallet_tambah') }}" class="p-5 space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Produk / E-Wallet *</label>
+                <input type="text" name="nama" required class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition" placeholder="Contoh: DANA, OVO, Pulsa Tsel">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Saldo Awal</label>
+                    <input type="number" name="stok" value="0" class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Admin Default</label>
+                    <input type="number" name="biaya_admin" value="2000" class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 transition">
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalTambah')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">Simpan Data</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal Update Stok (DAPAT DIAKSES KASIR) -->
+<div id="modalUpdateStok" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-up">
+        <div class="p-4 border-b flex justify-between items-center bg-indigo-50">
+            <h3 class="text-lg font-bold text-indigo-800">Isi Ulang Stok Saldo</h3>
+            <button onclick="closeModal('modalUpdateStok')" class="p-2 hover:bg-indigo-100 rounded-lg text-indigo-600"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="formUpdateStok" method="POST" class="p-5 space-y-4">
+            <div>
+                <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Produk:</p>
+                <p id="displayNamaWallet" class="text-lg font-black text-slate-800"></p>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nominal Saldo Yang Dibeli *</label>
+                <input type="number" name="tambah_stok" required min="1000" class="w-full px-4 py-3 border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 text-xl font-black text-indigo-700" placeholder="0">
+                <div class="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                    <p class="text-[10px] text-amber-700 leading-tight">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Penting: Pengisian stok akan otomatis mengurangi Kas Toko (Kas Keluar).
+                    </p>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalUpdateStok')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition text-sm">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition text-sm">Update Saldo</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Modal Edit Saldo Wallet -->
+{% if current_user.role != 'kasir' %}
+<div id="modalEditWallet" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-up">
+        <div class="p-4 border-b flex justify-between items-center bg-amber-50">
+            <h3 class="text-lg font-bold text-amber-800">Edit Data Wallet</h3>
+            <button onclick="closeModal('modalEditWallet')" class="p-2 hover:bg-amber-100 rounded-lg text-amber-600"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="formEditWallet" method="POST" class="p-5 space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nama Wallet *</label>
+                <input type="text" name="nama" id="editNamaWallet" required
+                       class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 transition">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Biaya Admin Default</label>
+                <input type="number" name="biaya_admin" id="editBiayaAdmin" min="0"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 transition">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Saldo Saat Ini</label>
+                <p id="editSaldoLama" class="text-lg font-black text-slate-600 px-1"></p>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Set Saldo Baru *</label>
+                <input type="number" name="saldo_baru" id="editSaldoBaru" required min="0"
+                       oninput="hitungSelisih()"
+                       class="w-full px-4 py-3 border border-amber-200 rounded-xl focus:ring-2 focus:ring-amber-500 text-xl font-black text-amber-700" placeholder="0">
+                <div id="infoSelisih" class="mt-2 p-3 rounded-lg border text-xs hidden"></div>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalEditWallet')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-50 transition text-sm">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 shadow-lg shadow-amber-100 transition text-sm">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openUpdateStok(id, nama) {
+    document.getElementById('formUpdateStok').action = '/wallet/update-stok/' + id;
+    document.getElementById('displayNamaWallet').innerText = nama;
+    openModal('modalUpdateStok');
+}
+
+let _saldoLama = 0;
+
+function openEditWallet(id, nama, saldo, admin) {
+    _saldoLama = saldo;
+    document.getElementById('formEditWallet').action = '/wallet/edit/' + id;
+    document.getElementById('editNamaWallet').value = nama;
+    document.getElementById('editBiayaAdmin').value = admin;
+    document.getElementById('editSaldoBaru').value = saldo;
+    document.getElementById('editSaldoLama').innerText = 'Rp ' + saldo.toLocaleString('id-ID');
+    document.getElementById('infoSelisih').classList.add('hidden');
+    openModal('modalEditWallet');
+}
+
+function hitungSelisih() {
+    const baru = parseFloat(document.getElementById('editSaldoBaru').value) || 0;
+    const selisih = baru - _saldoLama;
+    const box = document.getElementById('infoSelisih');
+    if (selisih === 0) {
+        box.classList.add('hidden');
+        return;
+    }
+    box.classList.remove('hidden');
+    if (selisih > 0) {
+        box.className = 'mt-2 p-3 rounded-lg border text-xs bg-red-50 border-red-100 text-red-700';
+        box.innerHTML = '<i class="fas fa-arrow-down mr-1"></i> Selisih <b>+Rp ' + selisih.toLocaleString('id-ID') + '</b> akan dicatat sebagai <b>Kas Keluar</b> (koreksi tambah saldo).';
+    } else {
+        box.className = 'mt-2 p-3 rounded-lg border text-xs bg-green-50 border-green-100 text-green-700';
+        box.innerHTML = '<i class="fas fa-arrow-up mr-1"></i> Selisih <b>-Rp ' + Math.abs(selisih).toLocaleString('id-ID') + '</b> akan dicatat sebagai <b>Kas Masuk</b> (koreksi kurang saldo).';
+    }
+}
+</script>
+{% endblock %}

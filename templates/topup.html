@@ -1,0 +1,349 @@
+{% extends 'base.html' %}
+{% block title %}Transaksi Top Up - Sparepart & Service{% endblock %}
+{% block page_title %}Transaksi Top Up & Pulsa{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <h3 class="text-lg font-semibold text-gray-800">Riwayat Top Up & Pulsa</h3>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <form method="GET" class="flex gap-2">
+                {% if current_user.role == 'admin' and cabangs %}
+                <select name="cabang_id" onchange="this.form.submit()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Semua Cabang</option>
+                    {% for c in cabangs %}<option value="{{ c.id }}" {{ 'selected' if cabang_id == c.id }}>{{ c.nama }}</option>{% endfor %}
+                </select>
+                {% endif %}
+            </form>
+            <button onclick="openModalTopUp()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2">
+                <i class="fas fa-plus"></i><span>Transaksi Baru</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Table -->
+<div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wider">
+            <tr>
+                <th class="px-6 py-3 text-left">No Nota</th>
+                <th class="px-6 py-3 text-left">Waktu</th>
+                <th class="px-6 py-3 text-left">Produk</th>
+                <th class="px-6 py-3 text-left">Pelanggan</th>
+                <th class="px-6 py-3 text-right">Modal Server</th>
+                <th class="px-6 py-3 text-right">Harga Jual</th>
+                {% if current_user.role == 'admin' %}<th class="px-6 py-3 text-right">Laba Bersih</th>{% endif %}
+                <th class="px-6 py-3 text-center">Aksi</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for item in pagination.items %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 font-mono text-indigo-600">{{ item.no_nota }}</td>
+                <td class="px-6 py-4 text-gray-500">{{ item.tanggal.strftime('%d/%m/%y %H:%M') }}</td>
+                <td class="px-6 py-4">
+                    <p class="font-bold text-gray-800">{{ item.wallet.nama }}</p>
+                    <p class="text-[10px] text-gray-400">Nominal: {{ "{:,.0f}".format(item.nominal).replace(',', '.') }}</p>
+                </td>
+                <td class="px-6 py-4 font-medium">{{ item.pelanggan or 'Umum' }}</td>
+                <td class="px-6 py-4 text-right text-rose-600 font-medium">Rp {{ "{:,.0f}".format(item.total_bayar - item.biaya_admin).replace(',', '.') }}</td>
+                <td class="px-6 py-4 text-right font-black text-gray-800">Rp {{ "{:,.0f}".format(item.total_bayar).replace(',', '.') }}</td>
+                {% if current_user.role == 'admin' %}<td class="px-6 py-4 text-right text-emerald-600 font-bold">+Rp {{ "{:,.0f}".format(item.biaya_admin).replace(',', '.') }}</td>{% endif %}
+                <td class="px-6 py-4 text-center">
+                    <!-- Tombol Hapus -->
+                    <a href="{{ url_for('topup_hapus', id=item.id) }}" 
+                       onclick="return confirm('Hapus transaksi ini? Modal server akan dikembalikan ke saldo wallet secara otomatis.')"
+                       class="p-2 text-red-600 hover:bg-red-50 rounded-lg inline-block" 
+                       title="Hapus Transaksi">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ 8 if current_user.role == 'admin' else 7 }}" class="px-6 py-12 text-center text-gray-400">Belum ada transaksi hari ini.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Transaksi Top Up -->
+<div id="modalTopup" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden">
+        <div class="p-4 border-b flex justify-between items-center bg-indigo-50">
+            <h3 class="text-lg font-bold text-indigo-800">Transaksi Top Up / Pulsa</h3>
+            <button onclick="closeModal('modalTopup')" class="p-2 hover:bg-indigo-100 rounded-lg text-indigo-600"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('topup_tambah') }}" class="p-6 space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Pilih Produk/Wallet *</label>
+                    <select name="wallet_id" id="selectWallet" required 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <option value="" disabled selected>-- Pilih Produk --</option>
+                        {% for w in wallets %}
+                        <option value="{{ w.id }}">
+                            {{ w.nama }} (Sisa: Rp {{ "{:,.0f}".format(w.stok_saldo).replace(',', '.') }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Pelanggan / No. HP</label>
+                    <input type="text" name="pelanggan" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="0812xxxx">
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nominal (Label) *</label>
+                    <input type="number" name="nominal" id="inputNominal" required min="1"
+                           class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-medium" placeholder="Cth: 50000">
+                    <p class="text-[9px] text-gray-400 mt-1 leading-tight">Hanya sebagai catatan nominal produk di nota.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-rose-600 uppercase mb-1">Modal Server *</label>
+                    <input type="number" name="modal_server" id="inputModal" required min="1" oninput="calculateLaba()"
+                           class="w-full px-3 py-2.5 border border-rose-300 bg-rose-50 rounded-lg focus:ring-2 focus:ring-rose-500 font-bold text-rose-700" placeholder="Cth: 50500">
+                    <p class="text-[9px] text-rose-500 mt-1 leading-tight">Biaya asli yang terpotong di aplikasi agen.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-indigo-600 uppercase mb-1">Harga Jual *</label>
+                    <input type="number" name="harga_jual" id="inputJual" required min="1" oninput="calculateLaba()"
+                           class="w-full px-3 py-2.5 border border-indigo-300 bg-indigo-50 rounded-lg focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700" placeholder="Cth: 53000">
+                    <p class="text-[9px] text-indigo-500 mt-1 leading-tight">Uang yang Anda terima dari pembeli.</p>
+                </div>
+            </div>
+
+            {% if current_user.role == 'admin' %}
+            <div class="bg-slate-800 p-4 rounded-xl text-white flex justify-between items-center shadow-inner">
+                <span class="text-sm font-medium text-slate-300">Keuntungan (Laba Bersih):</span>
+                <span id="displayLaba" class="text-2xl font-black text-emerald-400">Rp 0</span>
+            </div>
+            {% endif %}
+
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalTopup')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">Batal</button>
+                <button type="submit" class="flex-[2] px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition transform hover:scale-[1.02]">Simpan Transaksi</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Munculkan Modal dan reset form
+function openModalTopUp() {
+    document.getElementById('inputNominal').value = '';
+    document.getElementById('inputModal').value = '';
+    document.getElementById('inputJual').value = '';
+    const initLaba = document.getElementById('displayLaba');
+    if (initLaba) {
+        initLaba.innerText = 'Rp 0';
+        initLaba.classList.replace('text-red-400', 'text-emerald-400');
+    }
+    document.getElementById('selectWallet').selectedIndex = 0;
+    openModal('modalTopup');
+}
+
+// Fungsi menghitung Laba Bersih secara Real-time
+function calculateLaba() {
+    const modal = parseFloat(document.getElementById('inputModal').value) || 0;
+    const jual = parseFloat(document.getElementById('inputJual').value) || 0;
+    const laba = jual - modal;
+    
+    const displayLaba = document.getElementById('displayLaba');
+    if (!displayLaba) return; // Non-admin: elemen laba tidak dirender
+
+    if (jual === 0 && modal === 0) {
+        displayLaba.innerText = 'Rp 0';
+        displayLaba.classList.replace('text-red-400', 'text-emerald-400');
+        return;
+    }
+
+    displayLaba.innerText = formatRupiah(laba);
+    
+    // Ubah warna merah jika rugi (jual < modal)
+    if(laba < 0) {
+        displayLaba.classList.replace('text-emerald-400', 'text-red-400');
+    } else {
+        displayLaba.classList.replace('text-red-400', 'text-emerald-400');
+    }
+}
+</script>
+{% endblock %}{% extends 'base.html' %}
+{% block title %}Transaksi Top Up - Sparepart & Service{% endblock %}
+{% block page_title %}Transaksi Top Up & Pulsa{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <h3 class="text-lg font-semibold text-gray-800">Riwayat Top Up & Pulsa</h3>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <form method="GET" class="flex gap-2">
+                {% if current_user.role == 'admin' and cabangs %}
+                <select name="cabang_id" onchange="this.form.submit()" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Semua Cabang</option>
+                    {% for c in cabangs %}<option value="{{ c.id }}" {{ 'selected' if cabang_id == c.id }}>{{ c.nama }}</option>{% endfor %}
+                </select>
+                {% endif %}
+            </form>
+            <button onclick="openModalTopUp()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2">
+                <i class="fas fa-plus"></i><span>Transaksi Baru</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Table -->
+<div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wider">
+            <tr>
+                <th class="px-6 py-3 text-left">No Nota</th>
+                <th class="px-6 py-3 text-left">Waktu</th>
+                <th class="px-6 py-3 text-left">Produk</th>
+                <th class="px-6 py-3 text-left">Pelanggan</th>
+                <th class="px-6 py-3 text-right">Modal Server</th>
+                <th class="px-6 py-3 text-right">Harga Jual</th>
+                {% if current_user.role == 'admin' %}<th class="px-6 py-3 text-right">Laba Bersih</th>{% endif %}
+                <th class="px-6 py-3 text-center">Aksi</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            {% for item in pagination.items %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 font-mono text-indigo-600">{{ item.no_nota }}</td>
+                <td class="px-6 py-4 text-gray-500">{{ item.tanggal.strftime('%d/%m/%y %H:%M') }}</td>
+                <td class="px-6 py-4">
+                    <p class="font-bold text-gray-800">{{ item.wallet.nama }}</p>
+                    <p class="text-[10px] text-gray-400">Nominal: {{ "{:,.0f}".format(item.nominal).replace(',', '.') }}</p>
+                </td>
+                <td class="px-6 py-4 font-medium">{{ item.pelanggan or 'Umum' }}</td>
+                <td class="px-6 py-4 text-right text-rose-600 font-medium">Rp {{ "{:,.0f}".format(item.total_bayar - item.biaya_admin).replace(',', '.') }}</td>
+                <td class="px-6 py-4 text-right font-black text-gray-800">Rp {{ "{:,.0f}".format(item.total_bayar).replace(',', '.') }}</td>
+                {% if current_user.role == 'admin' %}<td class="px-6 py-4 text-right text-emerald-600 font-bold">+Rp {{ "{:,.0f}".format(item.biaya_admin).replace(',', '.') }}</td>{% endif %}
+                <td class="px-6 py-4 text-center">
+                    <!-- Tombol Hapus -->
+                    <a href="{{ url_for('topup_hapus', id=item.id) }}" 
+                       onclick="return confirm('Hapus transaksi ini? Modal server akan dikembalikan ke saldo wallet secara otomatis.')"
+                       class="p-2 text-red-600 hover:bg-red-50 rounded-lg inline-block" 
+                       title="Hapus Transaksi">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ 8 if current_user.role == 'admin' else 7 }}" class="px-6 py-12 text-center text-gray-400">Belum ada transaksi hari ini.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Transaksi Top Up -->
+<div id="modalTopup" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-xl overflow-hidden">
+        <div class="p-4 border-b flex justify-between items-center bg-indigo-50">
+            <h3 class="text-lg font-bold text-indigo-800">Transaksi Top Up / Pulsa</h3>
+            <button onclick="closeModal('modalTopup')" class="p-2 hover:bg-indigo-100 rounded-lg text-indigo-600"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('topup_tambah') }}" class="p-6 space-y-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Pilih Produk/Wallet *</label>
+                    <select name="wallet_id" id="selectWallet" required 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <option value="" disabled selected>-- Pilih Produk --</option>
+                        {% for w in wallets %}
+                        <option value="{{ w.id }}">
+                            {{ w.nama }} (Sisa: Rp {{ "{:,.0f}".format(w.stok_saldo).replace(',', '.') }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Pelanggan / No. HP</label>
+                    <input type="text" name="pelanggan" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="0812xxxx">
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nominal (Label) *</label>
+                    <input type="number" name="nominal" id="inputNominal" required min="1"
+                           class="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 font-medium" placeholder="Cth: 50000">
+                    <p class="text-[9px] text-gray-400 mt-1 leading-tight">Hanya sebagai catatan nominal produk di nota.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-rose-600 uppercase mb-1">Modal Server *</label>
+                    <input type="number" name="modal_server" id="inputModal" required min="1" oninput="calculateLaba()"
+                           class="w-full px-3 py-2.5 border border-rose-300 bg-rose-50 rounded-lg focus:ring-2 focus:ring-rose-500 font-bold text-rose-700" placeholder="Cth: 50500">
+                    <p class="text-[9px] text-rose-500 mt-1 leading-tight">Biaya asli yang terpotong di aplikasi agen.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-indigo-600 uppercase mb-1">Harga Jual *</label>
+                    <input type="number" name="harga_jual" id="inputJual" required min="1" oninput="calculateLaba()"
+                           class="w-full px-3 py-2.5 border border-indigo-300 bg-indigo-50 rounded-lg focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-700" placeholder="Cth: 53000">
+                    <p class="text-[9px] text-indigo-500 mt-1 leading-tight">Uang yang Anda terima dari pembeli.</p>
+                </div>
+            </div>
+
+            {% if current_user.role == 'admin' %}
+            <div class="bg-slate-800 p-4 rounded-xl text-white flex justify-between items-center shadow-inner">
+                <span class="text-sm font-medium text-slate-300">Keuntungan (Laba Bersih):</span>
+                <span id="displayLaba" class="text-2xl font-black text-emerald-400">Rp 0</span>
+            </div>
+            {% endif %}
+
+            <div class="flex gap-3 pt-2">
+                <button type="button" onclick="closeModal('modalTopup')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition">Batal</button>
+                <button type="submit" class="flex-[2] px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition transform hover:scale-[1.02]">Simpan Transaksi</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Munculkan Modal dan reset form
+function openModalTopUp() {
+    document.getElementById('inputNominal').value = '';
+    document.getElementById('inputModal').value = '';
+    document.getElementById('inputJual').value = '';
+    const initLaba = document.getElementById('displayLaba');
+    if (initLaba) {
+        initLaba.innerText = 'Rp 0';
+        initLaba.classList.replace('text-red-400', 'text-emerald-400');
+    }
+    document.getElementById('selectWallet').selectedIndex = 0;
+    openModal('modalTopup');
+}
+
+// Fungsi menghitung Laba Bersih secara Real-time
+function calculateLaba() {
+    const modal = parseFloat(document.getElementById('inputModal').value) || 0;
+    const jual = parseFloat(document.getElementById('inputJual').value) || 0;
+    const laba = jual - modal;
+    
+    const displayLaba = document.getElementById('displayLaba');
+    if (!displayLaba) return; // Non-admin: elemen laba tidak dirender
+
+    if (jual === 0 && modal === 0) {
+        displayLaba.innerText = 'Rp 0';
+        displayLaba.classList.replace('text-red-400', 'text-emerald-400');
+        return;
+    }
+
+    displayLaba.innerText = formatRupiah(laba);
+    
+    // Ubah warna merah jika rugi (jual < modal)
+    if(laba < 0) {
+        displayLaba.classList.replace('text-emerald-400', 'text-red-400');
+    } else {
+        displayLaba.classList.replace('text-red-400', 'text-emerald-400');
+    }
+}
+</script>
+{% endblock %}

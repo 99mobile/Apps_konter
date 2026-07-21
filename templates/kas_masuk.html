@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block title %}Kas Masuk - Sparepart & Service{% endblock %}
+{% block page_title %}Kas Masuk{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm">
+    <!-- Header -->
+    <div class="p-4 md:p-6 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <h3 class="text-lg font-semibold text-gray-800">Data Kas Masuk</h3>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <form method="GET" class="flex gap-2 flex-wrap w-full sm:w-auto">
+                                <div class="flex gap-2 w-full sm:w-auto">
+                    <input type="text" name="search" value="{{ search }}" placeholder="Cari keterangan..." 
+                           class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 w-full">
+                    <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+            <button onclick="openModal('modalTambah')" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center justify-center gap-2 whitespace-nowrap">
+                <i class="fas fa-plus"></i><span>Kas Masuk</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- TAMPILAN DESKTOP (Table) -->
+    <div class="hidden md:block overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sumber</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Keterangan</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Nominal</th>
+                    {% if current_user.role == 'admin' %}<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cabang</th>{% endif %}
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for item in pagination.items %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ item.tanggal.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2.5 py-1 text-xs font-bold rounded-lg uppercase tracking-wider
+                            {% if item.sumber == 'penjualan' %}bg-blue-100 text-blue-700
+                            {% elif item.sumber == 'service' %}bg-purple-100 text-purple-700
+                            {% else %}bg-gray-100 text-gray-700{% endif %}">
+                            {{ item.sumber }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">{{ item.keterangan or '-' }}</td>
+                    <td class="px-6 py-4 text-sm text-emerald-600 text-right font-bold">+ Rp {{ "{:,.0f}".format(item.nominal).replace(',', '.') }}</td>
+                    {% if current_user.role == 'admin' %}<td class="px-6 py-4 text-sm text-gray-500">{{ item.cabang.nama }}</td>{% endif %}
+                    <td class="px-6 py-4 text-center">
+                        {% if item.sumber == 'manual' %}
+                        <a href="{{ url_for('kas_masuk_hapus', id=item.id) }}" onclick="return confirm('Yakin hapus?')" 
+                           class="p-2 text-red-600 hover:bg-red-50 rounded-lg inline-block"><i class="fas fa-trash"></i></a>
+                        {% else %}
+                        <span class="text-xs text-gray-400 font-medium italic">Sistem</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="{{ 6 if current_user.role == 'admin' else 5 }}" class="px-6 py-8 text-center text-gray-500">Tidak ada data kas masuk</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- TAMPILAN MOBILE (Cards) -->
+    <div class="md:hidden p-4 space-y-3">
+        {% for item in pagination.items %}
+        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div class="flex justify-between items-start mb-3">
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wide
+                    {% if item.sumber == 'penjualan' %}bg-blue-100 text-blue-700
+                    {% elif item.sumber == 'service' %}bg-purple-100 text-purple-700
+                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                    {{ item.sumber }}
+                </span>
+                <p class="text-[11px] text-gray-400">{{ item.tanggal.strftime('%d/%m/%y %H:%M') }}</p>
+            </div>
+            
+            <h4 class="text-sm font-semibold text-gray-800 mb-1">{{ item.keterangan or 'Tanpa Keterangan' }}</h4>
+            
+            {% if current_user.role == 'admin' %}
+            <p class="text-[11px] text-gray-500 mb-3"><i class="fas fa-building mr-1"></i>{{ item.cabang.nama }}</p>
+            {% endif %}
+
+            <div class="flex justify-between items-end border-t pt-3 mt-2">
+                <div>
+                    <p class="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Nominal</p>
+                    <p class="text-lg font-bold text-emerald-600">+ Rp {{ "{:,.0f}".format(item.nominal).replace(',', '.') }}</p>
+                </div>
+                {% if item.sumber == 'manual' %}
+                <a href="{{ url_for('kas_masuk_hapus', id=item.id) }}" onclick="return confirm('Hapus kas ini?')" 
+                   class="w-10 h-10 flex items-center justify-center text-red-600 bg-red-50 rounded-xl border border-red-100">
+                    <i class="fas fa-trash"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-8 text-gray-500">Tidak ada data kas masuk</div>
+        {% endfor %}
+    </div>
+    
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="p-4 border-t flex justify-center">
+        <nav class="flex gap-1">
+            {% if pagination.has_prev %}<a href="{{ url_for('kas_masuk', page=pagination.prev_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">‹</a>{% endif %}
+            {% for p in pagination.iter_pages() %}{% if p %}<a href="{{ url_for('kas_masuk', page=p, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg {{ 'bg-blue-600 text-white' if p == pagination.page else 'hover:bg-gray-50' }}">{{ p }}</a>{% else %}<span class="px-3 py-2">...</span>{% endif %}{% endfor %}
+            {% if pagination.has_next %}<a href="{{ url_for('kas_masuk', page=pagination.next_num, search=search, cabang_id=cabang_id) }}" class="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50">›</a>{% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Tambah Kas Masuk -->
+<div id="modalTambah" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-800">Tambah Kas Masuk Manual</h3>
+            <button onclick="closeModal('modalTambah')" class="p-2 hover:bg-gray-200 rounded-lg transition-colors"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="POST" action="{{ url_for('kas_masuk_tambah') }}" class="p-5 space-y-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Nominal (Rp) *</label>
+                <input type="number" name="nominal" required min="1" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="Contoh: 500000">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Keterangan *</label>
+                <textarea name="keterangan" required rows="3" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="Contoh: Tambah modal awal, Pinjaman, dll"></textarea>
+            </div>
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="closeModal('modalTambah')" class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-600 hover:bg-gray-50">Batal</button>
+                <button type="submit" class="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Simpan Kas</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
