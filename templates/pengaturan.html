@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Pengaturan Aplikasi</h2>
+            <p class="text-muted mb-0">Kelola informasi aplikasi dan toko Anda.</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('pengaturan_simpan') }}">
+
+                <div class="mb-3">
+                    <label class="form-label">Nama Aplikasi / Toko</label>
+                    <input
+                        type="text"
+                        name="nama_aplikasi"
+                        class="form-control"
+                        value="{{ setting.nama_aplikasi or '' }}"
+                        placeholder="Contoh: 99 Mobile"
+                    >
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Tagline</label>
+                    <input
+                        type="text"
+                        name="tagline"
+                        class="form-control"
+                        value="{{ setting.tagline or '' }}"
+                        placeholder="Service - Sparepart - Accessories"
+                    >
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Logo</label>
+                    <input
+                        type="text"
+                        name="logo"
+                        class="form-control"
+                        value="{{ setting.logo or 'logo.png' }}"
+                        placeholder="logo.png"
+                    >
+                    <small class="text-muted">
+                        Masukkan nama file logo yang ada di folder static/images.
+                    </small>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    Simpan Pengaturan
+                </button>
+
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    Kembali
+                </a>
+
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
